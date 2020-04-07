@@ -1,2 +1,2 @@
 # NeuromorphicProcessor
-Neuromorphic hardware implementaion for Master thesis
+Neuromorphic processor implementation for Master thesis
