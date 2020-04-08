@@ -2,3 +2,7 @@
 .bloop*
 project/*
 target/*
+
+*.json
+test_run_dir/
+build/
