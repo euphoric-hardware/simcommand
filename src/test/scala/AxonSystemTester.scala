@@ -11,7 +11,7 @@ class AxonSystemTest(dut: AxonSystem) extends PeekPokeTester(dut) {
     poke(dut.io.rEna, false)
     step(5)
     
-    //write to one mem
+    //write to one mem 
     for(i <- 0 to 1024*5-1){
         if(i % 5 == 0){
             poke(dut.io.axonIn, (i/5))
@@ -25,7 +25,7 @@ class AxonSystemTest(dut: AxonSystem) extends PeekPokeTester(dut) {
 
 
 
-    //read the other mem
+    //read the other mem should be empty
     poke(dut.io.rEna, true)
     for(i <- 0 to 1024-1){
         //println("read step: " + i.toString)
@@ -37,11 +37,12 @@ class AxonSystemTest(dut: AxonSystem) extends PeekPokeTester(dut) {
     poke(dut.io.rEna, false)
 
     step(5)
-
+    //new time step
     poke(dut.io.inOut, true)
 
     step(5)
 
+    //test newly written memory
     poke(dut.io.rEna, true)
     for(i <- 0 to 1024-1){
         //println("2nd read step: " + i.toString)
@@ -53,6 +54,36 @@ class AxonSystemTest(dut: AxonSystem) extends PeekPokeTester(dut) {
     poke(dut.io.rEna, false)
 
     step(5)
+
+    //write to the other memory
+    for(i <- 0 to 1024*5-1){
+        if(i % 5 == 0){
+            poke(dut.io.axonIn, (i/5))
+            poke(dut.io.axonValid, true)
+
+        }else{
+            poke(dut.io.axonValid, false)
+        }
+        step(1)
+    }
+
+    step(5)
+
+    //new timestep
+    poke(dut.io.inOut, false)
+
+    step(5)
+
+    //test other written memory
+    poke(dut.io.rEna, true)
+    for(i <- 0 to 1024-1){
+        //println("2nd read step: " + i.toString)
+        poke(dut.io.rAddr,i)
+        step(1)
+        //println("data expect: " + (i*5).toString + "Get: " + peek(dut.io.rData).toString)
+        expect(dut.io.rData, i )
+    }
+    poke(dut.io.rEna, false)
 
 
 
