@@ -47,7 +47,7 @@ class AxonSystem extends Module{
     
     rdata1 := DontCare
     when (ena1){
-        val rdwrPort1 = axonMem0(addr1)
+        val rdwrPort1 = axonMem1(addr1)
         when(wr1){
             rdwrPort1 := wdata1
         }.otherwise{
@@ -90,4 +90,9 @@ class AxonSystem extends Module{
         spikeCntReg := spikeCntReg + 1.U
     }
     
+}
+
+
+object AxonSystem extends App {
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new AxonSystem())
 }
