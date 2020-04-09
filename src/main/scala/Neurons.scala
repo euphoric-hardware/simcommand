@@ -19,24 +19,27 @@ class EvalCntrSigs() extends Bundle() {
 
 class NeuronEvaluator extends Module {
   val io = IO(new Bundle {
-    val dataIn = Input(UInt(NEUDATAWIDTH.W))
-    val dataOut = Output(UInt(NEUDATAWIDTH.W))
-
-    val spikeIndi = Output(Bool())
-    val refracIndi = Output(Bool())
-
-    val cntrSels = Input(new EvalCntrSigs())
+      val dataIn = Input(UInt(NEUDATAWIDTH.W))
+      val dataOut = Output(UInt(NEUDATAWIDTH.W))
+      
+      val spikeIndi = Output(Bool())
+      val refracIndi = Output(Bool())
+      
+      val cntrSels = Input(new EvalCntrSigs())
   }
   )
-
+  
   //internal signals:
   val sum = Wire(UInt(NEUDATAWIDTH.W))
   val refracRegNext = Wire(UInt(NEUDATAWIDTH.W))
-
+  
   val membPotReg = RegInit(0.U(NEUDATAWIDTH.W))
   val refracCntReg = RegNext(refracRegNext)
   val spikeIndiReg = RegInit(false.B)
-
+  
+  //default assignment
+  io.dataOut := io.dataIn
+  
   sum := membPotReg + io.dataIn
 
   switch(io.cntrSels.potSel) {
@@ -76,8 +79,9 @@ class NeuronEvaluator extends Module {
       io.dataOut := refracCntReg - 1.U
     }
   }
-
-
+  
   io.refracIndi := refracRegNext === 0.U
+  io.spikeIndi := spikeIndiReg
+
 
 }
