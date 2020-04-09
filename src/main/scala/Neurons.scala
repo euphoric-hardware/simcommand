@@ -33,7 +33,7 @@ class NeuronEvaluator extends Module {
   val sum = Wire(UInt(NEUDATAWIDTH.W))
   val refracRegNext = Wire(UInt(NEUDATAWIDTH.W))
   
-  val membPotReg = RegInit(0.U(NEUDATAWIDTH.W))
+  val membPotReg = RegInit(0.U(NEUDATAWIDTH.W)) //TODO consider SInt
   val refracCntReg = RegNext(refracRegNext)
   val spikeIndiReg = RegInit(false.B)
   
@@ -69,7 +69,7 @@ class NeuronEvaluator extends Module {
       io.dataOut := io.dataIn
     }
     is(1.U) {
-      when(spikeIndiReg) { //maybe chance this chosing of potential to write back
+      when(~spikeIndiReg) { //TODO maybe chance this chosing of potential to write back
         io.dataOut := sum
       }.otherwise {
         io.dataOut := 0.U
