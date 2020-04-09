@@ -2,6 +2,7 @@
 .bloop*
 project/*
 target/*
+.idea/
 
 *.json
 test_run_dir/
