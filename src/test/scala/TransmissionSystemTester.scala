@@ -2,7 +2,7 @@ import chisel3.iotesters.PeekPokeTester
 import org.scalatest._
 import Constants._
 
-class PriorityMaskEncoderTest(dut: PriorityMaskEncoder) extends PeekPokeTester(dut) {
+class PriorityMaskRstEncoderTest(dut: PriorityMaskRstEncoder) extends PeekPokeTester(dut) {
   //test no reqs
   for(i <- 0 to EVALUNITS-1){
     poke(dut.io.reqs(i), false)
@@ -13,8 +13,10 @@ class PriorityMaskEncoderTest(dut: PriorityMaskEncoder) extends PeekPokeTester(d
   expect(dut.io.value, 0)
   for(i <- 0 to EVALUNITS-1){
     expect(dut.io.mask(i), false)
+    expect(dut.io.rst(i), false)
   }
 
+  //test reqs
   for(i <- 0 to EVALUNITS-1){
     for(j <- 0 to EVALUNITS-1){
       poke(dut.io.reqs(j), false)
@@ -32,14 +34,28 @@ class PriorityMaskEncoderTest(dut: PriorityMaskEncoder) extends PeekPokeTester(d
     }else{
       expect(dut.io.value, i)
     }
+
+    for(j <- 0 to EVALUNITS-1){
+      if(i == 0){//stupid causation of above loop
+        if(j == EVALUNITS-1){
+          expect(dut.io.rst(j), true)
+        }else{
+          expect(dut.io.rst(j), false)
+        }
+      } else if(i == j){
+        expect(dut.io.rst(j), true)
+      } else{
+        expect(dut.io.rst(j), false)
+      }
+    }
   }
 
 
   
 }
 
-class PriorityMaskEncoderSpec extends FlatSpec with Matchers {
-  "PriorityMaskEncoder " should "pass" in {
-    chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new PriorityMaskEncoder()) { c => new PriorityMaskEncoderTest(c) } should be(true)
+class PriorityMaskRstEncoderSpec extends FlatSpec with Matchers {
+  "PriorityMaskRstEncoder " should "pass" in {
+    chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new PriorityMaskRstEncoder()) { c => new PriorityMaskRstEncoderTest(c) } should be(true)
   }
 }

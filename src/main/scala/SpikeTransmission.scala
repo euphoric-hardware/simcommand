@@ -23,11 +23,12 @@ class TransmissionSystem extends Module {
 
 }
 
-class PriorityMaskEncoder extends Module{
+class PriorityMaskRstEncoder extends Module{
   val io = IO(new Bundle{
-    val reqs = Input(Vec(EVALUNITS, Bool()))
+    val reqs  = Input(Vec(EVALUNITS, Bool()))
     val value = Output(UInt(log2Up(EVALUNITS).W))
-    val mask = Output(Vec(EVALUNITS, Bool()))
+    val mask  = Output(Vec(EVALUNITS, Bool()))
+    val rst   = Output(Vec(EVALUNITS, Bool()))
     val valid = Output(Bool())
   })
 
@@ -45,6 +46,14 @@ class PriorityMaskEncoder extends Module{
     when(io.reqs(j)){
       io.valid := true.B
       io.value := j.U
+    }
+  }
+
+  for(j <- 0 to EVALUNITS-1){
+    when(j.U === io.value && io.valid){
+      io.rst(j) := true.B
+    }.otherwise{
+      io.rst(j) := false.B
     }
   }
 
