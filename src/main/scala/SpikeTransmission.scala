@@ -73,7 +73,11 @@ class PriorityMaskRstEncoder extends Module{
   io.valid := false.B
 
 
-  io.mask(EVALUNITS-1) := false.B
+  when(io.value === 0.U){
+    io.mask(EVALUNITS-1) := true.B
+  }.otherwise{
+    io.mask(EVALUNITS-1) := false.B
+  }
   for(i <- 0 to EVALUNITS-2){
     io.mask(i) := io.mask(i+1) || io.reqs(i+1) 
   }
@@ -97,5 +101,5 @@ class PriorityMaskRstEncoder extends Module{
 
 
 object TransmissionSystem extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new TransmissionSystem())
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new TransmissionSystem(0))
 }

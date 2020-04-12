@@ -12,7 +12,7 @@ class PriorityMaskRstEncoderTest(dut: PriorityMaskRstEncoder) extends PeekPokeTe
   expect(dut.io.valid, false)
   expect(dut.io.value, 0)
   for(i <- 0 to EVALUNITS-1){
-    expect(dut.io.mask(i), false)
+    expect(dut.io.mask(i), true)
     expect(dut.io.rst(i), false)
   }
 
