@@ -7,7 +7,7 @@ class TransmissionSystem(coreID: Int) extends Module {
     //For Communication fabric interface
     val ack = Input(Bool())
     val valid = Output(Bool())
-    val data = Output(UInt((log2Up(EVALUNITS)+N).W))
+    val data = Output(UInt((log2Up(CORES)+log2Up(EVALUNITS)+N).W))
 
     // For Neurons control
     val ns = Input(Vec(EVALUNITS, UInt(N.W)))
