@@ -26,8 +26,8 @@ class BusInterface(coreId : Int) extends Module{
   //TODO this is a temporary ROM do a function for mapping actual network 
   val romContent = (0 until CORES).map(i=>if (i % log2Up(CORES) == 0) (1 << AXONMSBWIDTH) | (i >> log2Up(CORES)-AXONMSBWIDTH) else (i >> log2Up(CORES)-AXONMSBWIDTH))
   val romContChi = romContent.map(i => i.asUInt((AXONMSBWIDTH+1).W))
-  val synROMReg  = RegInit(0.U((AXONMSBWIDTH+1).W))
   val filterROM  = VecInit(romContChi)
+  val synROMReg  = RegInit(0.U((AXONMSBWIDTH+1).W))
   //TODO this is a temporary ROM do a function for mapping actual network 
   
   val enaROM     = Wire(Bool())
