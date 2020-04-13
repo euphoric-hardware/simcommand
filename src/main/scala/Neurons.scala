@@ -85,3 +85,72 @@ class NeuronEvaluator extends Module {
 
 
 }
+
+class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
+  val io = IO(new Bundle {
+    val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
+    val wr        = Input(Bool()) //false: read, true: write
+    val ena       = Input(Bool())
+    val readData  = Output(UInt(NEUDATAWIDTH.W))
+    val writeData = Input(UInt(NEUDATAWIDTH.W))
+  }
+  )
+
+  val refracPotMem = SyncReadMem(2*N, UInt(NEUDATAWIDTH.W))
+  val memRead = Wire(UInt(NEUDATAWIDTH.W))
+  val syncOut = RegInit(false.B)
+  
+  //TODO - make mapping functions to fill memories
+  val weights     = (0 until N*AXONNR).map(i => i)
+  val weightsUInt = weights.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val weightsROM  = VecInit(weightsUInt)
+
+  val biases     = (0 until N).map(i => i)
+  val biasesUInt = biases.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val biasesROM  = VecInit(biasesUInt)
+  
+  val decays     = (0 until N).map(i => i)
+  val decaysUInt = decays.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val decaysROM  = VecInit(decaysUInt)
+  
+  val thresholds     = (0 until N).map(i => i)
+  val thresholdsUInt = thresholds.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val thresholdsROM  = VecInit(thresholdsUInt)
+
+  val refracSets     = (0 until N).map(i => i)
+  val refracSetsUInt = refracSets.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val refracSetsROM  = VecInit(refracSetsUInt)
+  //TODO - make mapping functions to fill memories
+  
+  val romRead = RegInit(0.U(NEUDATAWIDTH.W))
+
+  syncOut := false.B
+  when(io.ena){
+    when(io.addr < (2*N).U){
+      val rdwrPort = refracPotMem(io.addr)
+      when(io.wr) {
+        rdwrPort := io.writeData
+      }.otherwise{
+        syncOut := true.B
+        memRead := rdwrPort
+      }
+    }.elsewhen(io.addr < (2*N+N*AXONNR).U){ //TODO: try to do this without subtracting
+      romRead := weightsROM(io.addr - (2*N).U)
+    }.elsewhen(io.addr < (3*N+N*AXONNR).U){
+      romRead := biasesROM(io.addr - (2*N+N*AXONNR).U)
+    }.elsewhen(io.addr < (4*N+N*AXONNR).U){
+      romRead := decaysROM(io.addr - (3*N+N*AXONNR).U)
+    }.elsewhen(io.addr < (5*N+N*AXONNR).U){
+      romRead := thresholdsROM(io.addr - (4*N+N*AXONNR).U)
+    }.otherwise{
+      romRead := refracSetsROM(io.addr - (5*N+N*AXONNR).U)
+    }
+  }
+
+  io.readData := romRead
+  when(syncOut) {
+    io.readData := memRead
+  }
+
+
+}
