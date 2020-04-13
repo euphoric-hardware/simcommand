@@ -134,16 +134,16 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
         syncOut := true.B
         memRead := rdwrPort
       }
-    }.elsewhen(io.addr < (2*N+N*AXONNR).U){ //TODO: try to do this without subtracting
-      romRead := weightsROM(io.addr - (2*N).U)
-    }.elsewhen(io.addr < (3*N+N*AXONNR).U){
-      romRead := biasesROM(io.addr - (2*N+N*AXONNR).U)
-    }.elsewhen(io.addr < (4*N+N*AXONNR).U){
-      romRead := decaysROM(io.addr - (3*N+N*AXONNR).U)
-    }.elsewhen(io.addr < (5*N+N*AXONNR).U){
-      romRead := thresholdsROM(io.addr - (4*N+N*AXONNR).U)
+    }.elsewhen(io.addr < OSBIAS.U){ 
+      romRead := weightsROM(io.addr - OSWEIGHT.U) //TODO: try to do this without subtracting
+    }.elsewhen(io.addr < OSDECAY.U){
+      romRead := biasesROM(io.addr - OSBIAS.U)
+    }.elsewhen(io.addr < OSTHRESH.U){
+      romRead := decaysROM(io.addr - OSDECAY.U)
+    }.elsewhen(io.addr < OSREFRACSET.U){
+      romRead := thresholdsROM(io.addr - OSTHRESH.U)
     }.otherwise{
-      romRead := refracSetsROM(io.addr - (5*N+N*AXONNR).U)
+      romRead := refracSetsROM(io.addr - OSREFRACSET.U)
     }
   }
 
