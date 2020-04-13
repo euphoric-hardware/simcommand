@@ -19,23 +19,23 @@ class EvalCntrSigs() extends Bundle() {
 
 class NeuronEvaluator extends Module {
   val io = IO(new Bundle {
-      val dataIn = Input(UInt(NEUDATAWIDTH.W))
-      val dataOut = Output(UInt(NEUDATAWIDTH.W))
+      val dataIn     = Input(UInt(NEUDATAWIDTH.W))
+      val dataOut    = Output(UInt(NEUDATAWIDTH.W))
       
-      val spikeIndi = Output(Bool())
+      val spikeIndi  = Output(Bool())
       val refracIndi = Output(Bool())
       
-      val cntrSels = Input(new EvalCntrSigs())
+      val cntrSels   = Input(new EvalCntrSigs())
   }
   )
   
   //internal signals:
-  val sum = Wire(UInt(NEUDATAWIDTH.W))
+  val sum           = Wire(UInt(NEUDATAWIDTH.W))
   val refracRegNext = Wire(UInt(NEUDATAWIDTH.W))
   
-  val membPotReg = RegInit(0.U(NEUDATAWIDTH.W)) //TODO consider SInt
-  val refracCntReg = RegNext(refracRegNext)
-  val spikeIndiReg = RegInit(false.B)
+  val membPotReg    = RegInit(0.U(NEUDATAWIDTH.W)) //TODO consider SInt
+  val refracCntReg  = RegNext(refracRegNext)
+  val spikeIndiReg  = RegInit(false.B)
   
   //default assignment
   io.dataOut := io.dataIn
@@ -96,28 +96,28 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
   }
   )
 
-  val refracPotMem = SyncReadMem(2*N, UInt(NEUDATAWIDTH.W))
+  val refracPotMem = SyncReadMem(2*TMNEURONS, UInt(NEUDATAWIDTH.W))
   val memRead = Wire(UInt(NEUDATAWIDTH.W))
   val syncOut = RegInit(false.B)
   
   //TODO - make mapping functions to fill memories
-  val weights     = (0 until N*AXONNR).map(i => i)
+  val weights     = (0 until TMNEURONS*AXONNR).map(i => i)
   val weightsUInt = weights.map(i => i.asUInt(NEUDATAWIDTH.W))
   val weightsROM  = VecInit(weightsUInt)
 
-  val biases     = (0 until N).map(i => i)
+  val biases     = (0 until TMNEURONS).map(i => i)
   val biasesUInt = biases.map(i => i.asUInt(NEUDATAWIDTH.W))
   val biasesROM  = VecInit(biasesUInt)
   
-  val decays     = (0 until N).map(i => i)
+  val decays     = (0 until TMNEURONS).map(i => i)
   val decaysUInt = decays.map(i => i.asUInt(NEUDATAWIDTH.W))
   val decaysROM  = VecInit(decaysUInt)
   
-  val thresholds     = (0 until N).map(i => i)
+  val thresholds     = (0 until TMNEURONS).map(i => i)
   val thresholdsUInt = thresholds.map(i => i.asUInt(NEUDATAWIDTH.W))
   val thresholdsROM  = VecInit(thresholdsUInt)
 
-  val refracSets     = (0 until N).map(i => i)
+  val refracSets     = (0 until TMNEURONS).map(i => i)
   val refracSetsUInt = refracSets.map(i => i.asUInt(NEUDATAWIDTH.W))
   val refracSetsROM  = VecInit(refracSetsUInt)
   //TODO - make mapping functions to fill memories
@@ -126,7 +126,7 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
 
   syncOut := false.B
   when(io.ena){
-    when(io.addr < (2*N).U){
+    when(io.addr < (2*TMNEURONS).U){
       val rdwrPort = refracPotMem(io.addr)
       when(io.wr) {
         rdwrPort := io.writeData
@@ -134,14 +134,19 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
         syncOut := true.B
         memRead := rdwrPort
       }
+    
     }.elsewhen(io.addr < OSBIAS.U){ 
       romRead := weightsROM(io.addr - OSWEIGHT.U) //TODO: try to do this without subtracting
+    
     }.elsewhen(io.addr < OSDECAY.U){
       romRead := biasesROM(io.addr - OSBIAS.U)
+    
     }.elsewhen(io.addr < OSTHRESH.U){
       romRead := decaysROM(io.addr - OSDECAY.U)
+    
     }.elsewhen(io.addr < OSREFRACSET.U){
       romRead := thresholdsROM(io.addr - OSTHRESH.U)
+    
     }.otherwise{
       romRead := refracSetsROM(io.addr - OSREFRACSET.U)
     }
@@ -153,4 +158,118 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
   }
 
 
+}
+
+class ControlUnit extends Module{
+  val io = IO(new Bundle {
+    //for evaluation memories
+    val addr       = Output(UInt(EVALMEMADDRWIDTH.W))
+    val wr         = Output(Bool()) //false: read, true: write
+    val ena        = Output(Bool())
+    //For neuron evaluator
+    val spikeIndi  = Input(Vec(EVALUNITS, Bool()))
+    val refracIndi = Input(Vec(EVALUNITS, Bool()))
+    val cntrSels   = Output(Vec(EVALUNITS, new EvalCntrSigs()))
+    //For axon system
+    val inOut      = Output(Bool())
+    val spikeCnt   = Input(UInt(AXONIDWIDTH.W))
+    val aAddr      = Output(UInt(AXONIDWIDTH.W))
+    val aEna       = Output(Bool())
+    val aData      = Input(UInt(AXONIDWIDTH.W))
+    //For spike transmission system
+    val n          = Output(UInt(N.W))
+    val spikes     = Output(Vec(EVALUNITS, Bool()))
+  }
+  )
+
+  val idle :: rRefrac :: rPot :: rWeight1 :: rWeight2 :: rBias :: rDecay :: rThresh :: rRefracSet :: wRefrac :: wPot :: Nil = Enum(11)
+  val stateReg = RegInit(idle)
+
+  val spikePulse = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
+  val tsCycleCnt = RegInit(CYCLESPRSTEP.U)                        //count time step cycles down to 0
+  val n          = RegInit(0.U(N.W))                              // time multiplex evaluation counter
+  val a          = RegInit(0.U(AXONIDWIDTH.W))                    //axon system addr counter
+  val spikeCnt   = RegInit(0.U(AXONIDWIDTH.W))                    //register that stores sample of axons incoming spike counter
+  val inOut      = RegInit(false.B)                               //used to inform spike system of new timestep
+
+  val evalAddr     = Wire(UInt(EVALMEMADDRWIDTH.W))
+  val addrOffset   = Wire(UInt(EVALMEMADDRWIDTH.W))
+  val addrSpecific = Wire(UInt(EVALMEMADDRWIDTH.W))
+
+  //Default assignments
+  for(i <- 0 until EVALUNITS){
+    spikePulse(i) := false.B
+    io.cntrSels(i).potSel       := 0.U //TODO reconsider default of control
+    io.cntrSels(i).spikeSel     := 0.U
+    io.cntrSels(i).refracSel    := 0.U
+    io.cntrSels(i).writeDataSel := 0.U
+    
+    io.spikes(i)                := spikePulse(i)
+  }
+  io.addr  := evalAddr
+  io.wr    := false.B
+  io.ena   := false.B
+  io.inOut := inOut
+  io.aAddr := 0.U //TODO consider if this should be based on reg - probs no
+  io.aEna  := false.B
+  io.n     := n
+
+  addrOffset   := 0.U
+  addrSpecific := 0.U
+  evalAddr     := addrOffset + addrSpecific
+  
+  
+  //time step cycle counter
+  tsCycleCnt := tsCycleCnt - 1.U
+  when(tsCycleCnt === 0.U){
+    tsCycleCnt := CYCLESPRSTEP.U
+  }
+
+  
+
+  switch(stateReg){
+    is(idle){
+      n := 0.U
+      a := 0.U
+      when(tsCycleCnt === 0.U){
+        spikeCnt := io.spikeCnt
+        inOut := ~inOut
+        stateReg := rRefrac
+      }
+    }
+    is(rRefrac){
+      io.ena       := true.B
+      io.wr        := false.B
+      addrOffset   := OSPOTENTIAL.U
+      addrSpecific := n
+      stateReg     := rPot
+    }
+    is(rPot){
+      
+    }
+    is(rWeight1){
+      
+    }
+    is(rWeight2){
+      
+    }
+    is(rBias){
+      
+    }
+    is(rDecay){
+      
+    }
+    is(rThresh){
+      
+    }
+    is(rRefracSet){
+      
+    }
+    is(wRefrac){
+      
+    }
+    is(wPot){
+      
+    }
+  }
 }
