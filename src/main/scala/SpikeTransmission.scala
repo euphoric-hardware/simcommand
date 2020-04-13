@@ -7,10 +7,10 @@ class TransmissionSystem(coreID: Int) extends Module {
     //For Communication fabric interface
     val ack = Input(Bool())
     val valid = Output(Bool())
-    val data = Output(UInt((log2Up(CORES)+log2Up(EVALUNITS)+N).W))
+    val data = Output(UInt(GLOBALADDRWIDTH.W))
 
     // For Neurons control
-    val ns = Input(Vec(EVALUNITS, UInt(N.W)))
+    val n = Input(UInt(N.W))
     val spikes = Input(Vec(EVALUNITS, Bool()))
   }
   )
@@ -41,7 +41,7 @@ class TransmissionSystem(coreID: Int) extends Module {
     spikeUpdate(i) := rstAckSel(i) && spikeRegs(i)
 
     when(~spikeUpdate(i)){
-      neuronIdLSB(i) := io.ns(i)
+      neuronIdLSB(i) := io.n
 
       when(io.spikes(i)){
         spikeRegs(i) := true.B
