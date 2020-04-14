@@ -14,7 +14,7 @@ class EvalCntrSigs() extends Bundle() {
   val potSel       = UInt(2.W) //0: dataIn, 1: Sum, 2: PotReg
   val spikeSel     = UInt(2.W) //0: >thres, 1: reset, 2,3: keep
   val refracSel    = UInt(1.W) //0: dataIn, 1: RefracReg
-  val writeDataSel = UInt(2.W) //0: dataIn, 1: Potential: RefractoryCont
+  val writeDataSel = UInt(2.W) //0: dataIn, 1: Potential, 2: RefractoryCont
 }
 
 class NeuronEvaluator extends Module {
@@ -77,7 +77,7 @@ class NeuronEvaluator extends Module {
       when(~spikeIndiReg) { //TODO maybe chance this choosing of potential to write back
         io.dataOut := membPotReg
       }.otherwise {
-        io.dataOut := dataIn
+        io.dataOut := io.dataIn
       }
     }
     is(2.U) {
