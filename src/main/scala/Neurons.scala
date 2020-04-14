@@ -129,6 +129,10 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
   val refracSets     = (0 until TMNEURONS).map(i => i)
   val refracSetsUInt = refracSets.map(i => i.asUInt(NEUDATAWIDTH.W))
   val refracSetsROM  = VecInit(refracSetsUInt)
+
+  val potentialSet     = (0 until TMNEURONS).map(i => i)
+  val potentialSetUInt = potentialSet.map(i => i.asUInt(NEUDATAWIDTH.W))
+  val potentialSetROM  = VecInit(potentialSetUInt)
   //TODO - make mapping functions to fill memories
   
   val romRead = RegInit(0.U(NEUDATAWIDTH.W))
@@ -156,8 +160,11 @@ class EvaluationMemory(coreID : Int, evalID : Int) extends Module{
     }.elsewhen(io.addr < OSREFRACSET.U){
       romRead := thresholdsROM(io.addr - OSTHRESH.U)
     
-    }.otherwise{
+    }.elsewhen(io.addr < OSPOTSET.U){
       romRead := refracSetsROM(io.addr - OSREFRACSET.U)
+
+    }.otherwise{
+      romRead := potentialSetROM(io.addr - OSPOTSET.U)
     }
   }
 
