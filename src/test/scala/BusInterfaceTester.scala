@@ -72,7 +72,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
   expect(dut.io.ack, false)
   expect(dut.io.valid, false)
   expect(dut.io.axonID, Integer.parseInt("0010101010", 2))
-  
+
 }
 
 class BusInterfaceSpec extends FlatSpec with Matchers {

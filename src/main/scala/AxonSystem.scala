@@ -4,28 +4,29 @@ import Constants._
 class AxonSystem extends Module {
   val io = IO(new Bundle {
     //For Communication fabric interface
-    val axonIn = Input(UInt(AXONIDWIDTH.W))
+    val axonIn    = Input(UInt(AXONIDWIDTH.W))
     val axonValid = Input(Bool())
 
     //For Neurons Controller
-    val inOut = Input(Bool())
+    val inOut    = Input(Bool())
     val spikeCnt = Output(UInt(AXONIDWIDTH.W))
 
     val rAddr = Input(UInt(AXONIDWIDTH.W))
-    val rEna = Input(Bool())
+    val rEna  = Input(Bool())
     val rData = Output(UInt(AXONIDWIDTH.W))
   }
   )
 
   val spikeCntReg = RegInit(0.U(AXONIDWIDTH.W))
+  
   io.spikeCnt := spikeCntReg
 
   //Memories
-  val ena0 = Wire(Bool())
-  val wr0 = Wire(Bool()) //0: read, 1: write
-  val rdata0 = Wire(UInt(AXONIDWIDTH.W))
-  val wdata0 = Wire(UInt(AXONIDWIDTH.W))
-  val addr0 = Wire(UInt(AXONIDWIDTH.W))
+  val ena0     = Wire(Bool())
+  val wr0      = Wire(Bool()) //0: read, 1: write
+  val rdata0   = Wire(UInt(AXONIDWIDTH.W))
+  val wdata0   = Wire(UInt(AXONIDWIDTH.W))
+  val addr0    = Wire(UInt(AXONIDWIDTH.W))
   val axonMem0 = SyncReadMem(AXONNR, UInt(AXONIDWIDTH.W))
 
   rdata0 := DontCare
@@ -38,11 +39,11 @@ class AxonSystem extends Module {
     }
   }
 
-  val ena1 = Wire(Bool())
-  val wr1 = Wire(Bool())
-  val rdata1 = Wire(UInt(AXONIDWIDTH.W))
-  val wdata1 = Wire(UInt(AXONIDWIDTH.W))
-  val addr1 = Wire(UInt(AXONIDWIDTH.W))
+  val ena1     = Wire(Bool())
+  val wr1      = Wire(Bool())
+  val rdata1   = Wire(UInt(AXONIDWIDTH.W))
+  val wdata1   = Wire(UInt(AXONIDWIDTH.W))
+  val addr1    = Wire(UInt(AXONIDWIDTH.W))
   val axonMem1 = SyncReadMem(AXONNR, UInt(AXONIDWIDTH.W))
 
   rdata1 := DontCare
@@ -56,27 +57,27 @@ class AxonSystem extends Module {
   }
 
   when(~io.inOut) { // all mem related mux
-    ena0 := io.axonValid
-    wr0 := true.B
+    ena0   := io.axonValid
+    wr0    := true.B
     wdata0 := io.axonIn
-    addr0 := spikeCntReg
+    addr0  := spikeCntReg
 
-    ena1 := io.rEna
-    wr1 := false.B
+    ena1     := io.rEna
+    wr1      := false.B
     io.rData := rdata1
-    wdata1 := 0.U
-    addr1 := io.rAddr
+    wdata1   := 0.U
+    addr1    := io.rAddr
   }.otherwise {
-    ena0 := io.rEna
-    wr0 := false.B
+    ena0     := io.rEna
+    wr0      := false.B
     io.rData := rdata0
-    wdata0 := 0.U
-    addr0 := io.rAddr
+    wdata0   := 0.U
+    addr0    := io.rAddr
 
-    ena1 := io.axonValid
-    wr1 := true.B
-    wdata1 := io.axonIn
-    addr1 := spikeCntReg
+    ena1     := io.axonValid
+    wr1      := true.B
+    wdata1   := io.axonIn
+    addr1    := spikeCntReg
   }
 
 

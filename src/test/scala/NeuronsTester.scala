@@ -9,7 +9,7 @@ class NeuronEvaluatorTest(dut: NeuronEvaluator) extends PeekPokeTester(dut) {
   poke(dut.io.cntrSels.refracSel, 1)
   poke(dut.io.cntrSels.writeDataSel, 0)
   step(1)
-  
+
   // load potential:
   poke(dut.io.cntrSels.potSel, 0)
   poke(dut.io.dataIn, 12)
@@ -21,7 +21,7 @@ class NeuronEvaluatorTest(dut: NeuronEvaluator) extends PeekPokeTester(dut) {
   // load 10 weight and check membrane potential
   poke(dut.io.cntrSels.potSel, 1)
   var totalweight = 0
-  for(i <- 0 to 10){
+  for (i <- 0 to 10) {
     poke(dut.io.dataIn, i)
     step(1)
     totalweight += i
@@ -55,7 +55,6 @@ class NeuronEvaluatorTest(dut: NeuronEvaluator) extends PeekPokeTester(dut) {
   expect(dut.io.spikeIndi, 1)
 
 
-  
 }
 
 class NeuronEvaluatorSpec extends FlatSpec with Matchers {
@@ -63,3 +62,5 @@ class NeuronEvaluatorSpec extends FlatSpec with Matchers {
     chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new NeuronEvaluator()) { c => new NeuronEvaluatorTest(c) } should be(true)
   }
 }
+
+

@@ -3,12 +3,12 @@ import chisel3.util._
 import Constants._
 
 
-class NeuronCore(coreID : Int) extends Module{
-  val io = IO(new Bundle{
-    val grant   = Input(Bool())
-    val req     = Output(Bool())
-    val tx      = Output(UInt(GLOBALADDRWIDTH.W))
-    val rx      = Input(UInt(GLOBALADDRWIDTH.W))
+class NeuronCore(coreID: Int) extends Module {
+  val io = IO(new Bundle {
+    val grant = Input(Bool())
+    val req   = Output(Bool())
+    val tx    = Output(UInt(GLOBALADDRWIDTH.W))
+    val rx    = Input(UInt(GLOBALADDRWIDTH.W))
   })
 
   val interface  = Module(new BusInterface(coreID))
@@ -33,7 +33,7 @@ class NeuronCore(coreID : Int) extends Module{
   neurons.io.aData        := axonSystem.io.rData
 
   spikeTrans.io.n         := neurons.io.n
-  for(i <- 0 until EVALUNITS){
+  for (i <- 0 until EVALUNITS) {
     spikeTrans.io.spikes(i) := neurons.io.spikes(i)
   }
 
