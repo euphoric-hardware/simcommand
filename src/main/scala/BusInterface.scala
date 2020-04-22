@@ -16,7 +16,7 @@ class BusInterface(coreId: Int) extends Module {
 
     // for spike transmission valid/ready
     val spikeID = Input(UInt(GLOBALADDRWIDTH.W))
-    val ack     = Output(Bool())
+    val ready     = Output(Bool())
     val reqIn   = Input(Bool())
   })
 
@@ -26,7 +26,7 @@ class BusInterface(coreId: Int) extends Module {
   }
 
   io.reqOut := io.reqIn && ~io.grant
-  io.ack    := io.grant
+  io.ready    := io.grant
 
   //TODO this is a temporary ROM do a function for mapping actual network 
   val romContent = (0 until CORES).map(i => if (i % log2Up(CORES) == 0) (1 << AXONMSBWIDTH) | (i >> log2Up(CORES) - AXONMSBWIDTH) else (i >> log2Up(CORES) - AXONMSBWIDTH))
