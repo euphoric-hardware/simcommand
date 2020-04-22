@@ -23,7 +23,7 @@ class NeuronCore(coreID: Int) extends Module {
   axonSystem.io.axonIn    := interface.io.axonID
   axonSystem.io.axonValid := interface.io.valid
   interface.io.spikeID    := spikeTrans.io.data
-  spikeTrans.io.ack       := interface.io.ack
+  spikeTrans.io.ready     := interface.io.ready
   interface.io.reqIn      := spikeTrans.io.valid
 
   axonSystem.io.inOut     := neurons.io.inOut

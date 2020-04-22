@@ -6,7 +6,7 @@ class TransmissionSystem(coreID: Int) extends Module {
   val io = IO(new Bundle {
     //For Communication fabric interface
     val data   = Output(UInt(GLOBALADDRWIDTH.W))
-    val ack    = Input(Bool())
+    val ready  = Input(Bool())
     val valid  = Output(Bool())
 
     // For Neurons control
@@ -21,7 +21,7 @@ class TransmissionSystem(coreID: Int) extends Module {
 
   val spikeEncoder = Module(new PriorityMaskRstEncoder)
   val encoderReqs  = Wire(Vec(EVALUNITS, Bool()))
-  val rstAckSel    = Wire(Vec(EVALUNITS, Bool()))
+  val rstReadySel    = Wire(Vec(EVALUNITS, Bool()))
   val spikeUpdate  = Wire(Vec(EVALUNITS, Bool()))
 
   spikeEncoder.io.reqs := encoderReqs
@@ -31,14 +31,14 @@ class TransmissionSystem(coreID: Int) extends Module {
 
 
   for (i <- 0 to EVALUNITS - 1) {
-    when(io.ack) {
+    when(io.ready) {
       maskRegs(i) := spikeEncoder.io.mask(i)
     }
 
     encoderReqs(i) := maskRegs(i) && spikeRegs(i)
 
-    rstAckSel(i)   := ~(spikeEncoder.io.rst(i) && io.ack)
-    spikeUpdate(i) := rstAckSel(i) && spikeRegs(i)
+    rstReadySel(i)   := ~(spikeEncoder.io.rst(i) && io.ready)
+    spikeUpdate(i) := rstReadySel(i) && spikeRegs(i)
 
     when(~spikeUpdate(i)) {
       neuronIdLSB(i) := io.n

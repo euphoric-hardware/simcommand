@@ -13,7 +13,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
 
   expect(dut.io.reqOut, false)
   expect(dut.io.tx, 0)
-  expect(dut.io.ack, false)
+  expect(dut.io.ready, false)
   expect(dut.io.valid, false)
   expect(dut.io.axonID, 0)
 
@@ -27,7 +27,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
 
   expect(dut.io.reqOut, true)
   expect(dut.io.tx, 0)
-  expect(dut.io.ack, false)
+  expect(dut.io.ready, false)
   expect(dut.io.valid, false)
   expect(dut.io.axonID, 0)
 
@@ -41,7 +41,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
 
   expect(dut.io.reqOut, false)
   expect(dut.io.tx, Integer.parseInt("101010101010", 2))
-  expect(dut.io.ack, true)
+  expect(dut.io.ready, true)
   expect(dut.io.valid, false)
   expect(dut.io.axonID, 0)
 
@@ -55,7 +55,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
 
   expect(dut.io.reqOut, false)
   expect(dut.io.tx, 0)
-  expect(dut.io.ack, false)
+  expect(dut.io.ready, false)
   expect(dut.io.valid, true)
   expect(dut.io.axonID, Integer.parseInt("0010101010", 2))
 
@@ -69,7 +69,7 @@ class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
 
   expect(dut.io.reqOut, false)
   expect(dut.io.tx, 0)
-  expect(dut.io.ack, false)
+  expect(dut.io.ready, false)
   expect(dut.io.valid, false)
   expect(dut.io.axonID, Integer.parseInt("0010101010", 2))
 
