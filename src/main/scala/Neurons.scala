@@ -137,6 +137,9 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
 
   val romRead = RegInit(0.U(NEUDATAWIDTH.W))
 
+  //default assignment 
+  memRead := 0.U
+
   syncOut := false.B
   when(io.ena) {
     when(io.addr < (2 * TMNEURONS).U) {

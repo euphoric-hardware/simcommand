@@ -1,5 +1,6 @@
 import chisel3.iotesters.PeekPokeTester
 import org.scalatest._
+import Constants._
 
 class NeuronEvaluatorTest(dut: NeuronEvaluator) extends PeekPokeTester(dut) {
 
@@ -64,3 +65,88 @@ class NeuronEvaluatorSpec extends FlatSpec with Matchers {
 }
 
 
+class EvaluationMemoryTest(dut: EvaluationMemory) extends PeekPokeTester(dut) {
+
+  //default is all zero
+  step(1)
+
+  expect(dut.io.readData, 0)
+
+  // write to writeable part
+
+  poke(dut.io.addr, 5)
+  poke(dut.io.wr, true)
+  poke(dut.io.ena, true)
+  poke(dut.io.writeData, 5)
+
+  step(1)
+
+  //read the written data non written then written address
+
+  poke(dut.io.addr, 15)
+  poke(dut.io.wr, false)
+  poke(dut.io.writeData, 0)
+  
+  step(1)
+
+  expect(dut.io.readData, 0)
+  
+  poke(dut.io.addr, 5)
+  poke(dut.io.wr, false)
+  
+  step(1)
+
+  expect(dut.io.readData, 5)
+
+  //read from ROMs
+
+  poke(dut.io.addr, OSWEIGHT + 1)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 1)
+
+  poke(dut.io.addr, OSBIAS + 2)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 2)
+  
+  poke(dut.io.addr, OSDECAY + 3)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 3)
+
+  poke(dut.io.addr, OSTHRESH + 4)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 4)
+
+  poke(dut.io.addr, OSREFRACSET + 5)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 5)
+
+  poke(dut.io.addr, OSPOTSET + 6)
+  poke(dut.io.wr, false)
+
+  step(1)
+
+  expect(dut.io.readData, 6)
+
+
+}
+
+class EvaluationMemorySpec extends FlatSpec with Matchers {
+  "EvaluationMemory " should "pass" in {
+    chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new EvaluationMemory(0, 0)) { c => new EvaluationMemoryTest(c) } should be(true)
+  }
+}
