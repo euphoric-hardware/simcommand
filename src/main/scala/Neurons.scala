@@ -204,13 +204,14 @@ class ControlUnit extends Module {
   val idle :: rRefrac :: rPot :: rWeight1 :: rWeight2 :: rBias :: rDecay :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(11)
   val stateReg = RegInit(idle)
 
-  val spikePulse   = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
-  val tsCycleCnt   = RegInit(CYCLESPRSTEP.U) //count time step cycles down to 0
-  val n            = RegInit(0.U(N.W)) // time multiplex evaluation counter
-  val aNext        = Wire(UInt(AXONIDWIDTH.W))
-  val a            = RegNext(aNext) //axon system addr counter
-  val spikeCnt     = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
-  val inOut        = RegInit(false.B) //used to inform spike system of new timestep
+  val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
+  val tsCycleCnt     = RegInit(CYCLESPRSTEP.U) //count time step cycles down to 0
+  val n              = RegInit(0.U(N.W)) // time multiplex evaluation counter
+  val aNext          = Wire(UInt(AXONIDWIDTH.W))
+  val a              = RegNext(aNext) //axon system addr counter
+  val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
+  val inOut          = RegInit(false.B) //used to inform spike system of new timestep
+  val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit have evaluated all mapped neurons
 
   val evalAddr     = Wire(UInt(EVALMEMADDRWIDTH.W))
   val addrOffset   = Wire(UInt(EVALMEMADDRWIDTH.W))
