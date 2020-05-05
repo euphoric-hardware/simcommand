@@ -27,4 +27,6 @@ object Constants {
   val OSREFRACSET = 5 * TMNEURONS + TMNEURONS * AXONNR
   val OSPOTSET    = 6 * TMNEURONS + TMNEURONS * AXONNR
 
+  //Hardcoded - consider chancing to be part of conf files or similar
+  val neuronsInCore = Array(64, 64, 64, 64, 64) // Dummy Conf
 }

@@ -179,7 +179,7 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
 
 }
 
-class ControlUnit extends Module {
+class ControlUnit(coreID : Int) extends Module {
   val io = IO(new Bundle {
     //for evaluation memories
     val addr       = Output(UInt(EVALMEMADDRWIDTH.W))
@@ -206,25 +206,42 @@ class ControlUnit extends Module {
 
   val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
   val tsCycleCnt     = RegInit(CYCLESPRSTEP.U) //count time step cycles down to 0
-  val n              = RegInit(0.U(N.W)) // time multiplex evaluation counter
+  val nNext          = Wire(UInt(N.W))
+  val n              = RegNext(nNext) // time multiplex evaluation counter
   val aNext          = Wire(UInt(AXONIDWIDTH.W))
   val a              = RegNext(aNext) //axon system addr counter
   val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
   val inOut          = RegInit(false.B) //used to inform spike system of new timestep
   val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit have evaluated all mapped neurons
+  val localCntrSels  = Wire(Vec(EVALUNITS, new EvalCntrSigs()))
+
 
   val evalAddr     = Wire(UInt(EVALMEMADDRWIDTH.W))
   val addrOffset   = Wire(UInt(EVALMEMADDRWIDTH.W))
   val addrSpecific = Wire(UInt(EVALMEMADDRWIDTH.W))
 
+  val nrNeuMapped  = RegInit(neuronsInCore(coreID).U)
+
 
   //Default assignments
   for (i <- 0 until EVALUNITS) {
     spikePulse(i)               := false.B
-    io.cntrSels(i).potSel       := 2.U //TODO reconsider default of control - should now be okay
+    localCntrSels(i).potSel       := 2.U //TODO reconsider default of control - should now be okay
+    localCntrSels(i).spikeSel     := 2.U
+    localCntrSels(i).refracSel    := 1.U
+    localCntrSels(i).writeDataSel := 0.U
+
+    when(evalUnitActive(i)){ // ensures that eval unit is still when all its neurons has been evauated
+      io.cntrSels(i).potSel       := localCntrSels(i).potSel
+      io.cntrSels(i).spikeSel     := localCntrSels(i).spikeSel
+      io.cntrSels(i).refracSel    := localCntrSels(i).refracSel
+      io.cntrSels(i).writeDataSel := localCntrSels(i).writeDataSel
+    }.otherwise{
+      io.cntrSels(i).potSel       := 2.U //TODO Check these defaults
     io.cntrSels(i).spikeSel     := 2.U
     io.cntrSels(i).refracSel    := 1.U
     io.cntrSels(i).writeDataSel := 0.U
+    }
 
     io.spikes(i)                := spikePulse(i)
   }
@@ -236,6 +253,7 @@ class ControlUnit extends Module {
   io.aEna      := true.B
   io.n         := n
        
+  nNext        := n
   aNext        := a
 
   addrOffset   := 0.U
@@ -249,11 +267,15 @@ class ControlUnit extends Module {
     tsCycleCnt := CYCLESPRSTEP.U
   }
 
+  //set evaluations units active state. (Usure still when all mapped neurons are evaluated)
+  for(i <- 0 until EVALUNITS) {
+      evalUnitActive(i) := nrNeuMapped > ((n << log2Up(EVALUNITS)) + i.U)
+    }
 
   switch(stateReg) {
     is(idle) {
-      n := 0.U
-      a := 0.U
+      nNext := 0.U
+      aNext := 0.U
       when(tsCycleCnt === 0.U) {
         spikeCnt := io.spikeCnt
         inOut    := ~inOut
@@ -267,7 +289,7 @@ class ControlUnit extends Module {
       addrSpecific := n
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).spikeSel := 1.U
+        localCntrSels(i).spikeSel := 1.U
       }
 
       stateReg := rPot
@@ -279,7 +301,7 @@ class ControlUnit extends Module {
       addrSpecific := n
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).refracSel := 0.U
+        localCntrSels(i).refracSel := 0.U
       }
 
       when(spikeCnt === 0.U) {
@@ -295,7 +317,7 @@ class ControlUnit extends Module {
       addrSpecific := n ## io.aData //TODO VERIFY THIS WORKS CONCATINATION
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).potSel := 0.U
+        localCntrSels(i).potSel := 0.U
       }
 
       aNext := a + 1.U
@@ -314,7 +336,7 @@ class ControlUnit extends Module {
 
       for (i <- 0 until EVALUNITS) {
         when(!io.refracIndi(i)) {
-          io.cntrSels(i).potSel := 1.U
+          localCntrSels(i).potSel := 1.U
         }
       }
       aNext := a + 1.U
@@ -333,12 +355,12 @@ class ControlUnit extends Module {
 
       when(spikeCnt === 0.U) {
         for (i <- 0 until EVALUNITS) {
-          io.cntrSels(i).potSel := 0.U
+          localCntrSels(i).potSel := 0.U
         }
       }.otherwise {
         for (i <- 0 until EVALUNITS) {
           when(!io.refracIndi(i)) {
-            io.cntrSels(i).potSel := 1.U
+            localCntrSels(i).potSel := 1.U
           }
         }
       }
@@ -353,7 +375,7 @@ class ControlUnit extends Module {
 
       for (i <- 0 until EVALUNITS) {
         when(!io.refracIndi(i)) {
-          io.cntrSels(i).potSel := 1.U
+          localCntrSels(i).potSel := 1.U
         }
       }
 
@@ -368,7 +390,7 @@ class ControlUnit extends Module {
 
       for (i <- 0 until EVALUNITS) { //TODO make sure that we can subtract we probs need to convert all to SINT
         when(!io.refracIndi(i)) {
-          io.cntrSels(i).potSel := 1.U
+          localCntrSels(i).potSel := 1.U
         }
       }
 
@@ -382,7 +404,7 @@ class ControlUnit extends Module {
       addrSpecific := n
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).spikeSel := 0.U
+        localCntrSels(i).spikeSel := 0.U
       }
 
       stateReg := wRefrac
@@ -394,7 +416,7 @@ class ControlUnit extends Module {
       addrSpecific := n
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).writeDataSel := 2.U
+        localCntrSels(i).writeDataSel := 2.U
       }
 
       stateReg := rPotSet
@@ -415,12 +437,12 @@ class ControlUnit extends Module {
       addrSpecific := n
 
       for (i <- 0 until EVALUNITS) {
-        io.cntrSels(i).writeDataSel := 1.U
+        localCntrSels(i).writeDataSel := 1.U
       }
 
       aNext      := 0.U
-      n          := n + 1.U
-      when(n === (TMNEURONS - 1).U) {
+      nNext      := n + 1.U
+      when((nNext << log2Up(EVALUNITS)) >= nrNeuMapped ) {
         stateReg := idle
       }.otherwise {
         stateReg := rRefrac
@@ -443,7 +465,7 @@ class Neurons(coreID: Int) extends Module {
     val spikes   = Output(Vec(EVALUNITS, Bool()))
   })
 
-  val controlUnit = Module(new ControlUnit)
+  val controlUnit = Module(new ControlUnit(coreID))
   val evalUnits   = (0 until EVALUNITS).map(i => Module(new NeuronEvaluator))
   val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory(coreID, i)))
 
