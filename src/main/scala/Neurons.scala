@@ -31,8 +31,10 @@ class NeuronEvaluator extends Module {
   )
 
   //internal signals:
-  val sum           = Wire(SInt(NEUDATAWIDTH.W))
-  val sumIn         = Wire(SInt(NEUDATAWIDTH.W))
+  val sum           = Wire(SInt((NEUDATAWIDTH+1).W))
+  val sumSat        = Wire(SInt(NEUDATAWIDTH.W))
+  val sumIn1        = Wire(SInt((NEUDATAWIDTH+1).W))
+  val sumIn2        = Wire(SInt((NEUDATAWIDTH+1).W))
   val refracRegNext = Wire(SInt(NEUDATAWIDTH.W))
   val potDecay      = Wire(SInt(NEUDATAWIDTH.W))
 
@@ -42,8 +44,18 @@ class NeuronEvaluator extends Module {
 
   //default assignment
   io.dataOut := io.dataIn
-  sumIn      := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - must be SInt
-  sum        := membPotReg + sumIn
+  sumIn1     := membPotReg
+  sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - check that -potdecay can be done
+  sum        := sumIn1 + sumIn2
+
+
+  // saturation
+  sumSat := sum
+  when(sum < 0.S){
+    sumSat := 0.S
+  }.elsewhen(sum > (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S){
+    sumSat := (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S
+  }
 
 
   switch(io.cntrSels.potSel) {
@@ -51,7 +63,7 @@ class NeuronEvaluator extends Module {
       membPotReg := io.dataIn
     }
     is(1.U) {
-      membPotReg := sum
+      membPotReg := sumSat
     }
     is(2.U) {
       membPotReg := membPotReg
