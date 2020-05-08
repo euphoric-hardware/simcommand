@@ -14,13 +14,14 @@ class EvalCntrSigs() extends Bundle() {
   val potSel = UInt(2.W) //0: dataIn, 1: Sum, 2: PotReg
   val spikeSel = UInt(2.W) //0: >thres, 1: reset, 2,3: keep
   val refracSel = UInt(1.W) //0: dataIn, 1: RefracReg
+  val decaySel = Bool()  //1: subtract decay, 0: otherwise
   val writeDataSel = UInt(2.W) //0: dataIn, 1: Potential, 2: RefractoryCont
 }
 
 class NeuronEvaluator extends Module {
   val io = IO(new Bundle {
-    val dataIn     = Input(UInt(NEUDATAWIDTH.W))
-    val dataOut    = Output(UInt(NEUDATAWIDTH.W))
+    val dataIn     = Input(SInt(NEUDATAWIDTH.W))
+    val dataOut    = Output(SInt(NEUDATAWIDTH.W))
 
     val spikeIndi  = Output(Bool())
     val refracIndi = Output(Bool())
@@ -30,16 +31,19 @@ class NeuronEvaluator extends Module {
   )
 
   //internal signals:
-  val sum           = Wire(UInt(NEUDATAWIDTH.W))
-  val refracRegNext = Wire(UInt(NEUDATAWIDTH.W))
+  val sum           = Wire(SInt(NEUDATAWIDTH.W))
+  val sumIn         = Wire(SInt(NEUDATAWIDTH.W))
+  val refracRegNext = Wire(SInt(NEUDATAWIDTH.W))
+  val potDecay      = Wire(SInt(NEUDATAWIDTH.W))
 
-  val membPotReg    = RegInit(0.U(NEUDATAWIDTH.W)) //TODO consider SInt
+  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W)) //TODO consider SInt
   val refracCntReg  = RegNext(refracRegNext)
   val spikeIndiReg  = RegInit(false.B)
 
   //default assignment
   io.dataOut := io.dataIn
-  sum        := membPotReg + io.dataIn
+  sumIn      := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - must be SInt
+  sum        := membPotReg + sumIn
 
 
   switch(io.cntrSels.potSel) {
@@ -51,6 +55,34 @@ class NeuronEvaluator extends Module {
     }
     is(2.U) {
       membPotReg := membPotReg
+    }
+  }
+
+  //constant multiplier
+  val decaySwitch = Wire(UInt(3.W))
+  decaySwitch := io.dataIn(2,0).asUInt
+  potDecay := membPotReg // default
+  switch(io.dataIn(2,0).asUInt) { // TODO ensure this works
+    is(1.U){
+      potDecay := membPotReg >> 1  //50%
+    }
+    is(2.U){
+      potDecay := membPotReg >> 2  //25%
+    }
+    is(3.U){
+      potDecay := membPotReg >> 3  //12.5%
+    }
+    is(4.U){
+      potDecay := membPotReg >> 4  //6.25%
+    }
+    is(5.U){
+      potDecay := membPotReg >> 5  //3.125%
+    }
+    is(6.U){
+      potDecay := membPotReg >> 6  //1.563%
+    }
+    is(7.U){
+      potDecay := membPotReg >> 7  //0.781%
     }
   }
 
@@ -84,12 +116,12 @@ class NeuronEvaluator extends Module {
       when(io.refracIndi) {
         io.dataOut := refracCntReg
       }.otherwise {
-        io.dataOut := refracCntReg - 1.U
+        io.dataOut := refracCntReg - 1.S
       }
     }
   }
 
-  io.refracIndi := refracRegNext === 0.U
+  io.refracIndi := refracRegNext === 0.S
   io.spikeIndi  := spikeIndiReg
 
 
@@ -100,45 +132,45 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
     val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
     val wr        = Input(Bool()) //false: read, true: write
     val ena       = Input(Bool())
-    val readData  = Output(UInt(NEUDATAWIDTH.W))
-    val writeData = Input(UInt(NEUDATAWIDTH.W))
+    val readData  = Output(SInt(NEUDATAWIDTH.W))
+    val writeData = Input(SInt(NEUDATAWIDTH.W))
   }
   )
 
-  val refracPotMem     = SyncReadMem(2 * TMNEURONS, UInt(NEUDATAWIDTH.W))
-  val memRead          = Wire(UInt(NEUDATAWIDTH.W))
+  val refracPotMem     = SyncReadMem(2 * TMNEURONS, SInt(NEUDATAWIDTH.W))
+  val memRead          = Wire(SInt(NEUDATAWIDTH.W))
   val syncOut          = RegInit(false.B)
 
   //TODO - make mapping functions to fill memories
   val weights          = (0 until TMNEURONS * AXONNR).map(i => i)
-  val weightsUInt      = weights.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val weightsROM       = VecInit(weightsUInt)
+  val weightsSInt      = weights.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val weightsROM       = VecInit(weightsSInt)
   
   val biases           = (0 until TMNEURONS).map(i => i)
-  val biasesUInt       = biases.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val biasesROM        = VecInit(biasesUInt)
+  val biasesSInt       = biases.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val biasesROM        = VecInit(biasesSInt)
   
   val decays           = (0 until TMNEURONS).map(i => i)
-  val decaysUInt       = decays.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val decaysROM        = VecInit(decaysUInt)
+  val decaysSInt       = decays.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val decaysROM        = VecInit(decaysSInt)
   
   val thresholds       = (0 until TMNEURONS).map(i => i)
-  val thresholdsUInt   = thresholds.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val thresholdsROM    = VecInit(thresholdsUInt)
+  val thresholdsSInt   = thresholds.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val thresholdsROM    = VecInit(thresholdsSInt)
   
   val refracSets       = (0 until TMNEURONS).map(i => i)
-  val refracSetsUInt   = refracSets.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val refracSetsROM    = VecInit(refracSetsUInt)
+  val refracSetsSInt   = refracSets.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val refracSetsROM    = VecInit(refracSetsSInt)
 
   val potentialSet     = (0 until TMNEURONS).map(i => i)
-  val potentialSetUInt = potentialSet.map(i => i.asUInt(NEUDATAWIDTH.W))
-  val potentialSetROM  = VecInit(potentialSetUInt)
+  val potentialSetSInt = potentialSet.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val potentialSetROM  = VecInit(potentialSetSInt)
   //TODO - make mapping functions to fill memories
 
-  val romRead = RegInit(0.U(NEUDATAWIDTH.W))
+  val romRead = RegInit(0.S(NEUDATAWIDTH.W))
 
   //default assignment 
-  memRead := 0.U
+  memRead := 0.S
 
   syncOut := false.B
   when(io.ena) {
@@ -230,17 +262,20 @@ class ControlUnit(coreID : Int) extends Module {
     localCntrSels(i).spikeSel     := 2.U
     localCntrSels(i).refracSel    := 1.U
     localCntrSels(i).writeDataSel := 0.U
+    localCntrSels(i).decaySel     := false.B
 
     when(evalUnitActive(i)){ // ensures that eval unit is still when all its neurons has been evauated
       io.cntrSels(i).potSel       := localCntrSels(i).potSel
       io.cntrSels(i).spikeSel     := localCntrSels(i).spikeSel
       io.cntrSels(i).refracSel    := localCntrSels(i).refracSel
       io.cntrSels(i).writeDataSel := localCntrSels(i).writeDataSel
+      io.cntrSels(i).decaySel     := localCntrSels(i).decaySel
     }.otherwise{
       io.cntrSels(i).potSel       := 2.U //TODO Check these defaults
-    io.cntrSels(i).spikeSel     := 2.U
-    io.cntrSels(i).refracSel    := 1.U
-    io.cntrSels(i).writeDataSel := 0.U
+      io.cntrSels(i).spikeSel     := 2.U
+      io.cntrSels(i).refracSel    := 1.U
+      io.cntrSels(i).writeDataSel := 0.U
+      io.cntrSels(i).decaySel     := false.B
     }
 
     io.spikes(i)                := spikePulse(i)
@@ -390,7 +425,8 @@ class ControlUnit(coreID : Int) extends Module {
 
       for (i <- 0 until EVALUNITS) { //TODO make sure that we can subtract we probs need to convert all to SINT
         when(!io.refracIndi(i)) {
-          localCntrSels(i).potSel := 1.U
+          localCntrSels(i).potSel   := 1.U
+          localCntrSels(i).decaySel := true.B
         }
       }
 
