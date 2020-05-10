@@ -1,6 +1,7 @@
 import chisel3._
 import chisel3.util._
 import Constants._
+import spray.json._
 
 /*NOTES
 Look through this design again
@@ -139,7 +140,36 @@ class NeuronEvaluator extends Module {
 
 }
 
+class ParameterReader { //Only for showcase
+  def JsArrayTo1DArray (jarray: JsArray) : Array[Int] = {
+    val jsonvallist = jarray.elements.toArray
+    var returnArray : Array[Int] = Array()
+    for (elem <- jsonvallist) returnArray = returnArray :+ elem.asInstanceOf[JsNumber].value.toInt
+    return returnArray
+  }
+
+  def JsArrayTo2DArray (jarray:JsArray) : Array[Array[Int]] = {
+    val jsonvallist = jarray.elements.toArray
+    var returnArray : Array[Array[Int]] = Array()
+    for (arr <- jsonvallist){
+      var tempArr : Array[Int] = Array()
+      for (elem <- arr.asInstanceOf[JsArray].elements.toArray) tempArr = tempArr :+ elem.asInstanceOf[JsNumber].value.toInt
+      returnArray = returnArray :+ tempArr
+    }
+
+    return returnArray
+  }
+
+  { //init code
+    val l1 = scala.collection.mutable.Map[String, Array[Int]]()
+    val l2 = scala.collection.mutable.Map[String, Array[Int]]()
+
+  }
+
+}
+
 class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
+  
   val io = IO(new Bundle {
     val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
     val wr        = Input(Bool()) //false: read, true: write
