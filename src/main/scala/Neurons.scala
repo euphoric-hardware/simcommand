@@ -45,7 +45,7 @@ class NeuronEvaluator extends Module {
   //default assignment
   io.dataOut := io.dataIn
   sumIn1     := membPotReg
-  sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - check that -potdecay can be done
+  sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - check that -potdecay can be done - Should be ok
   sum        := sumIn1 + sumIn2
 
 
@@ -74,7 +74,7 @@ class NeuronEvaluator extends Module {
   val decaySwitch = Wire(UInt(3.W))
   decaySwitch := io.dataIn(2,0).asUInt
   potDecay := membPotReg // default
-  switch(io.dataIn(2,0).asUInt) { // TODO ensure this works
+  switch(io.dataIn(2,0).asUInt) { // TODO ensure this works, TODO Should i have no delay
     is(1.U){
       potDecay := membPotReg >> 1  //50%
     }
