@@ -140,36 +140,7 @@ class NeuronEvaluator extends Module {
 
 }
 
-class ParameterReader { //Only for showcase
-  def JsArrayTo1DArray (jarray: JsArray) : Array[Int] = {
-    val jsonvallist = jarray.elements.toArray
-    var returnArray : Array[Int] = Array()
-    for (elem <- jsonvallist) returnArray = returnArray :+ elem.asInstanceOf[JsNumber].value.toInt
-    return returnArray
-  }
-
-  def JsArrayTo2DArray (jarray:JsArray) : Array[Array[Int]] = {
-    val jsonvallist = jarray.elements.toArray
-    var returnArray : Array[Array[Int]] = Array()
-    for (arr <- jsonvallist){
-      var tempArr : Array[Int] = Array()
-      for (elem <- arr.asInstanceOf[JsArray].elements.toArray) tempArr = tempArr :+ elem.asInstanceOf[JsNumber].value.toInt
-      returnArray = returnArray :+ tempArr
-    }
-
-    return returnArray
-  }
-
-  { //init code
-    val l1 = scala.collection.mutable.Map[String, Array[Int]]()
-    val l2 = scala.collection.mutable.Map[String, Array[Int]]()
-
-  }
-
-}
-
 class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
-  
   val io = IO(new Bundle {
     val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
     val wr        = Input(Bool()) //false: read, true: write
@@ -183,31 +154,33 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
   val memRead          = Wire(SInt(NEUDATAWIDTH.W))
   val syncOut          = RegInit(false.B)
 
-  //TODO - make mapping functions to fill memories
-  val weights          = (0 until TMNEURONS * AXONNR).map(i => i)
+  //Hardcoded mapping for showcase network
+  val params = new ParameterReader
+  val testw = params.getMemWeights(2, 0)
+  val weights          = params.getMemWeights(coreID, evalID)
   val weightsSInt      = weights.map(i => i.asSInt(NEUDATAWIDTH.W))
   val weightsROM       = VecInit(weightsSInt)
   
-  val biases           = (0 until TMNEURONS).map(i => i)
+  val biases           = params.getMemData("bias", coreID, evalID)
   val biasesSInt       = biases.map(i => i.asSInt(NEUDATAWIDTH.W))
   val biasesROM        = VecInit(biasesSInt)
   
-  val decays           = (0 until TMNEURONS).map(i => i)
+  val decays           = params.getMemData("decay", coreID, evalID)
   val decaysSInt       = decays.map(i => i.asSInt(NEUDATAWIDTH.W))
   val decaysROM        = VecInit(decaysSInt)
   
-  val thresholds       = (0 until TMNEURONS).map(i => i)
+  val thresholds       = params.getMemData("thres", coreID, evalID)
   val thresholdsSInt   = thresholds.map(i => i.asSInt(NEUDATAWIDTH.W))
   val thresholdsROM    = VecInit(thresholdsSInt)
   
-  val refracSets       = (0 until TMNEURONS).map(i => i)
+  val refracSets       = params.getMemData("refrac", coreID, evalID)
   val refracSetsSInt   = refracSets.map(i => i.asSInt(NEUDATAWIDTH.W))
   val refracSetsROM    = VecInit(refracSetsSInt)
 
-  val potentialSet     = (0 until TMNEURONS).map(i => i)
+  val potentialSet     = params.getMemData("reset", coreID, evalID)
   val potentialSetSInt = potentialSet.map(i => i.asSInt(NEUDATAWIDTH.W))
   val potentialSetROM  = VecInit(potentialSetSInt)
-  //TODO - make mapping functions to fill memories
+  //Hardcoded mapping for showcase network
 
   val romRead = RegInit(0.S(NEUDATAWIDTH.W))
 
