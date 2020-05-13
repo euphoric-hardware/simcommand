@@ -156,7 +156,7 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
 
   //Hardcoded mapping for showcase network
   val params = new ParameterReader
-  val testw = params.getMemWeights(2, 0)
+  
   val weights          = params.getMemWeights(coreID, evalID)
   val weightsSInt      = weights.map(i => i.asSInt(NEUDATAWIDTH.W))
   val weightsROM       = VecInit(weightsSInt)
