@@ -190,7 +190,7 @@ class Echo(frequency: Int, baudRate: Int) extends Module {
   tx.io.channel <> rx.io.channel
 }
 
-class UartMain(frequency: Int, baudRate: Int) extends Module {
+class Uart(frequency: Int, baudRate: Int) extends Module {
   val io = IO(new Bundle {
     val rxd = Input(UInt(1.W))
     val txd = Output(UInt(1.W))
@@ -222,5 +222,5 @@ class UartMain(frequency: Int, baudRate: Int) extends Module {
 }
 
 object UartMain extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new UartMain(50000000, 115200))
+  chisel3.Driver.execute(Array("--target-dir", "build"), () => new Uart(50000000, 115200))
 }
