@@ -11,23 +11,32 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
     val rx = Input(Bool())
 
     //valid ready for in and out cores
-    val inC0Data  = Output(UInt(32.W))
+    val inC0Data  = Output(UInt(24.W))
     val inC0Valid = Output(Bool())
     val inC0Ready = Input(Bool())
     
-    val inC1Data  = Output(UInt(32.W))
+    val inC1Data  = Output(UInt(24.W))
     val inC1Valid = Output(Bool())
     val inC1Ready = Input(Bool())
     
     val outCData  = Input(UInt(8.W))
     val outCValid = Input(Bool())
     val outCReady = Output(Bool())
+
+    //synchronize channels for input cores
+    val inC0HSin  = Input(Bool())
+    val inC0HSout = Output(Bool())
+
+    val inC1HSin  = Input(Bool())
+    val inC1HSout = Output(Bool())
   })
 
   val uart = Module(new Uart(frequency, baudRate))
 
   val txBuf = RegInit(0.U(8.W))
   val txV   = RegInit(false.B)
+
+  val phase = RegInit(false.B)
 
   val byteCnt = RegInit(0.U(2.W))
   val pixCnt = RegInit(0.U(log2Up(22*22)))
@@ -40,12 +49,16 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   val rate1 = RegInit(0.U(8.W))
   val rate0 = RegInit(0.U(8.W))
 
-  val inData = Wire(UInt(32.W))
+  val inCData = Wire(UInt(24.W))
 
   val idle :: start :: receiveW :: toCore :: Nil = Enum(4)
   val stateReg = RegInit(idle)
 
+  inCData := addr0 ## rate1 ## rate0
+
+  //rx default
   uart.io.rxd := io.rx
+  uart.io.rxReady := false.B
 
   //tx logic
   io.tx := uart.io.txd
@@ -57,20 +70,28 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   }
 
   //in core validReady logic
+  io.inC0HSout := phase
+  io.inC0Data := inCData
+  io.inC0Valid := inC0V
   when(inC0V && io.inC0Ready) {
     inC0V := false.B
   }
 
+  io.inC1HSout := phase
+  io.inC1Data := inCData
+  io.inC1Valid := inC1V
   when(inC1V && io.inC1Ready) {
     inC1V := false.B
   }
 
   switch(stateReg) { //This FSM controls revieving of rates
     is(idle) {//TODO how to start receiving
-
+      when(phase === io.inC0HSin && io.inC0HSin === io.inC1HSin) { // in phase means we can sent
+        stateReg := stateReg
+      }
     }
     is(start) {
-      when(uart.io.rxReady) {
+      when(uart.io.txReady) {
         stateReg := receiveW
       }.otherwise {
         pixCnt := 0.U
@@ -85,6 +106,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
         addr0 := rate1
         rate1 := rate0
         rate0 := uart.io.rxByte
+        uart.io.rxReady := true.B
 
         byteCnt := byteCnt + 1.U 
 
@@ -105,6 +127,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
       
       when(pixCnt === (22*22-1).U) {
         stateReg := idle
+        phase := ~phase
       }.otherwise {
         stateReg := receiveW
       }
