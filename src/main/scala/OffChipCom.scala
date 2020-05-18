@@ -36,10 +36,10 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   val txBuf = RegInit(0.U(8.W))
   val txV   = RegInit(false.B)
 
-  val phase = RegInit(false.B)
+  val phase = RegInit(false.B) // Init to in phase. download first
 
   val byteCnt = RegInit(0.U(2.W))
-  val pixCnt = RegInit(0.U(log2Up(22*22)))
+  val pixCnt = RegInit(0.U(log2Up(INPUTSIZE)))
 
   val inC0V = RegInit(false.B)
   val inC1V = RegInit(false.B)
@@ -125,7 +125,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
       }
       pixCnt := pixCnt + 1.U
       
-      when(pixCnt === (22*22-1).U) {
+      when(pixCnt === (INPUTSIZE-1).U) {
         stateReg := idle
         phase := ~phase
       }.otherwise {

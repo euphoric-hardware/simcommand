@@ -16,6 +16,7 @@ object Constants {
   val TMNEURONS        = 32
   val N                = log2Up(TMNEURONS)
   val EVALUNITS        = 8
+  val NEURONSPRCORE    = TMNEURONS * EVALUNITS
   val GLOBALADDRWIDTH  = log2Up(CORES) + log2Up(EVALUNITS) + N
   val AXONMSBWIDTH     = GLOBALADDRWIDTH - AXONIDWIDTH
   val EVALMEMADDRWIDTH = log2Up(7 * TMNEURONS + TMNEURONS * AXONNR)
