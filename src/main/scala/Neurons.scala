@@ -272,7 +272,7 @@ class ControlUnit(coreID : Int) extends Module {
 
   //Default assignments
   for (i <- 0 until EVALUNITS) {
-    spikePulse(i)               := false.B
+    spikePulse(i)                 := false.B
     localCntrSels(i).potSel       := 2.U //TODO reconsider default of control - should now be okay
     localCntrSels(i).spikeSel     := 2.U
     localCntrSels(i).refracSel    := 1.U
@@ -456,6 +456,7 @@ class ControlUnit(coreID : Int) extends Module {
 
       for (i <- 0 until EVALUNITS) {
         localCntrSels(i).spikeSel := 0.U
+        spikePulse(i) := io.spikeIndi(i)
       }
 
       stateReg := wRefrac
