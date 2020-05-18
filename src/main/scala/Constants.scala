@@ -20,6 +20,9 @@ object Constants {
   val GLOBALADDRWIDTH  = log2Up(CORES) + log2Up(EVALUNITS) + N
   val AXONMSBWIDTH     = GLOBALADDRWIDTH - AXONIDWIDTH
   val EVALMEMADDRWIDTH = log2Up(7 * TMNEURONS + TMNEURONS * AXONNR)
+  val RATEWIDTH        = log2Up(500)
+  val RATEADDRWIDTH    = log2Up(NEURONSPRCORE)
+  val INPUTSIZE        = 22*22
 
   //offsets
   val OSREFRAC    = 0
