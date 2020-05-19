@@ -16,7 +16,7 @@ class BusInterface(coreId: Int) extends Module {
 
     // for spike transmission valid/ready
     val spikeID = Input(UInt(GLOBALADDRWIDTH.W))
-    val ready     = Output(Bool())
+    val ready   = Output(Bool())
     val reqIn   = Input(Bool())
   })
 
