@@ -143,3 +143,30 @@ class ParameterReader { //Only for showcase
   }
 
 }
+
+class InterfaceReader { //Only for showcase
+  var cores = Map.empty[Int, Array[Array[Int]]]
+
+  def JsArrayTo1DArray (jarray: JsArray) : Array[Int] = {
+    val jsonvallist = jarray.elements.toArray
+    var returnArray : Array[Int] = Array()
+    for (elem <- jsonvallist) returnArray = returnArray :+ elem.asInstanceOf[JsNumber].value.toInt
+    return returnArray
+  }
+
+  def getFilter(coreID: Int) : Vector[Int] = {
+    val source = scala.io.Source.fromFile("mapping/interfaceLut484.json")
+    val lines = try source.mkString finally source.close()
+    val paramJson = lines.parseJson
+
+    val valid = JsArrayTo1DArray(paramJson.asInstanceOf[JsObject].fields("cores").asInstanceOf[JsObject].fields(coreID.toString).asInstanceOf[JsObject].fields("valid").asInstanceOf[JsArray])
+    val data = JsArrayTo1DArray(paramJson.asInstanceOf[JsObject].fields("cores").asInstanceOf[JsObject].fields(coreID.toString).asInstanceOf[JsObject].fields("data").asInstanceOf[JsArray])
+
+    var rom : Vector[Int] = Vector()
+    for(i <- 0 until valid.size){
+      rom = rom.:+((valid(i) << 2) + data(i))(collection.breakOut)
+    }
+    return rom
+  }
+
+}
