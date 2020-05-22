@@ -39,3 +39,7 @@ class NeuronCore(coreID: Int) extends Module {
 
 
 }
+
+object NeuronCore extends App {
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new NeuronCore(2))
+}
