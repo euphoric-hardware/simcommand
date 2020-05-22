@@ -6,8 +6,6 @@ class BusArbiter extends Module {
   val io = IO(new Bundle {
     val reqs   = Input(Vec(CORES, Bool()))
     val grants = Output(Vec(CORES, Bool()))
-
-
   })
 
   val maskedReqs = Wire(Vec(CORES, Bool()))

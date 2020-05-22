@@ -248,7 +248,7 @@ class ControlUnit(coreID : Int) extends Module {
   }
   )
 
-  val idle :: rRefrac :: rPot :: rWeight1 :: rWeight2 :: rBias :: rDecay :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(11)
+  val idle :: rRefrac :: rPot :: rWeight1 :: rWeight2 :: rBias :: rDecay :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(12)
   val stateReg = RegInit(idle)
 
   val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
@@ -540,6 +540,7 @@ class Neurons(coreID: Int) extends Module {
     evalUnits(i).io.cntrSels.spikeSel     := controlUnit.io.cntrSels(i).spikeSel
     evalUnits(i).io.cntrSels.refracSel    := controlUnit.io.cntrSels(i).refracSel
     evalUnits(i).io.cntrSels.writeDataSel := controlUnit.io.cntrSels(i).writeDataSel
+    evalUnits(i).io.cntrSels.decaySel     := controlUnit.io.cntrSels(i).decaySel
 
     evalMems(i).io.addr                   := controlUnit.io.addr
     evalMems(i).io.wr                     := controlUnit.io.wr

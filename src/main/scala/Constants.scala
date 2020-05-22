@@ -6,11 +6,12 @@ import util._
 import scala.math.pow
 
 object Constants {
-  val FREQ             = 80 //in MHz
+  val FREQ             = 80000000 //in Hz
+  val BAUDRATE         = 115200
   val TIMESTEP         = 1000 //micro seconds
-  val CYCLESPRSTEP     = (FREQ * pow(10, 6).toInt) / TIMESTEP
+  val CYCLESPRSTEP     = FREQ / TIMESTEP
   val CORES            = 7
-  val NEUDATAWIDTH     = 16
+  val NEUDATAWIDTH     = 17
   val AXONNR           = 1024
   val AXONIDWIDTH      = log2Up(AXONNR)
   val TMNEURONS        = 32
@@ -18,7 +19,7 @@ object Constants {
   val EVALUNITS        = 8
   val NEURONSPRCORE    = TMNEURONS * EVALUNITS
   val GLOBALADDRWIDTH  = log2Up(CORES) + log2Up(EVALUNITS) + N
-  val AXONMSBWIDTH     = GLOBALADDRWIDTH - AXONIDWIDTH
+  val AXONMSBWIDTH     = AXONIDWIDTH - log2Up(NEURONSPRCORE)
   val EVALMEMADDRWIDTH = log2Up(7 * TMNEURONS + TMNEURONS * AXONNR)
   val RATEWIDTH        = log2Up(500)
   val RATEADDRWIDTH    = log2Up(NEURONSPRCORE)
@@ -35,7 +36,7 @@ object Constants {
   val OSPOTSET    = 6 * TMNEURONS + TMNEURONS * AXONNR
 
   //Hardcoded - consider chancing to be part of conf files or similar
-  val neuronsInCore = Array(64, 64, 64, 64, 64) // Dummy Conf
+  val neuronsInCore = Array(256, 228, 100, 100, 100, 100, 200) // Neurons mapped to each core, in/outcores doesnt matter as they are used controlunit in neuron core
 }
 
 class ParameterReader { //Only for showcase
