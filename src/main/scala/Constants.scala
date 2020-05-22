@@ -113,15 +113,12 @@ class ParameterReader { //Only for showcase
             if (j < 100) {
               memData(i*AXONNR + j) = allData1(j)(i*EVALUNITS + evalID + offset)
             }else if (j >=256 && j < 256+100) {
-              memData(i*AXONNR + j) = allData2(j-256+100)(i*EVALUNITS + evalID + offset)
+              memData(i*AXONNR + j) = allData1(j-256+100)(i*EVALUNITS + evalID + offset)
             }
           }
         }
       }
     }
-
-
-
     return memData.toVector
   }
 

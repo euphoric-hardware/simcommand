@@ -154,40 +154,21 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
   val memRead          = Wire(SInt(NEUDATAWIDTH.W))
   val syncOut          = RegInit(false.B)
 
+  
   //Hardcoded mapping for showcase network
-  val params = new ParameterReader
-  
-  val weights          = params.getMemWeights(coreID, evalID)
-  val weightsSInt      = weights.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val weightsROM       = VecInit(weightsSInt)
-  
-  val biases           = params.getMemData("bias", coreID, evalID)
-  val biasesSInt       = biases.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val biasesROM        = VecInit(biasesSInt)
-  
-  val decays           = params.getMemData("decay", coreID, evalID)
-  val decaysSInt       = decays.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val decaysROM        = VecInit(decaysSInt)
-  
-  val thresholds       = params.getMemData("thres", coreID, evalID)
-  val thresholdsSInt   = thresholds.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val thresholdsROM    = VecInit(thresholdsSInt)
-  
-  val refracSets       = params.getMemData("refrac", coreID, evalID)
-  val refracSetsSInt   = refracSets.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val refracSetsROM    = VecInit(refracSetsSInt)
-
-  val potentialSet     = params.getMemData("reset", coreID, evalID)
-  val potentialSetSInt = potentialSet.map(i => i.asSInt(NEUDATAWIDTH.W))
-  val potentialSetROM  = VecInit(potentialSetSInt)
-  //Hardcoded mapping for showcase network
-
+  val pROM = Module(new PROM(coreID, evalID))
   val romRead = RegInit(0.S(NEUDATAWIDTH.W))
+  val romEna = Wire(Bool())
+
 
   //default assignment 
   memRead := 0.S
-
   syncOut := false.B
+  romEna := false.B
+
+  pROM.io.ena := romEna
+  pROM.io.addr := io.addr
+  romRead := pROM.io.data
   when(io.ena) {
     when(io.addr < (2 * TMNEURONS).U) {
       val rdwrPort = refracPotMem(io.addr)
@@ -197,24 +178,8 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
         syncOut := true.B
         memRead := rdwrPort
       }
-
-    }.elsewhen(io.addr < OSBIAS.U) {
-      romRead := weightsROM(io.addr - OSWEIGHT.U) //TODO: try to do this without subtracting
-
-    }.elsewhen(io.addr < OSDECAY.U) {
-      romRead := biasesROM(io.addr - OSBIAS.U)
-
-    }.elsewhen(io.addr < OSTHRESH.U) {
-      romRead := decaysROM(io.addr - OSDECAY.U)
-
-    }.elsewhen(io.addr < OSREFRACSET.U) {
-      romRead := thresholdsROM(io.addr - OSTHRESH.U)
-
-    }.elsewhen(io.addr < OSPOTSET.U) {
-      romRead := refracSetsROM(io.addr - OSREFRACSET.U)
-
-    }.otherwise {
-      romRead := potentialSetROM(io.addr - OSPOTSET.U)
+    }.otherwise{
+      romEna := true.B
     }
   }
 
@@ -224,6 +189,72 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
   }
 
 
+}
+
+object OneMem extends App {
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new EvaluationMemory(4,0))
+}
+
+class PROM(coreID : Int, evalID : Int) extends Module{
+
+  val io = IO(new Bundle{
+    val ena       = Input(Bool())
+    val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
+    val data      = Output(SInt(NEUDATAWIDTH.W))
+  })
+
+  val params = new ParameterReader
+
+  val weights          = params.getMemWeights(coreID, evalID)
+  val weightsSInt      = weights.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val weightsROM       = VecInit(weightsSInt)
+
+  val biases           = params.getMemData("bias", coreID, evalID)
+  val biasesSInt       = biases.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val biasesROM        = VecInit(biasesSInt)
+
+  val decays           = params.getMemData("decay", coreID, evalID)
+  val decaysSInt       = decays.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val decaysROM        = VecInit(decaysSInt)
+
+  val thresholds       = params.getMemData("thres", coreID, evalID)
+  val thresholdsSInt   = thresholds.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val thresholdsROM    = VecInit(thresholdsSInt)
+
+  val refracSets       = params.getMemData("refrac", coreID, evalID)
+  val refracSetsSInt   = refracSets.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val refracSetsROM    = VecInit(refracSetsSInt)
+
+  val potentialSet     = params.getMemData("reset", coreID, evalID)
+  val potentialSetSInt = potentialSet.map(i => i.asSInt(NEUDATAWIDTH.W))
+  val potentialSetROM  = VecInit(potentialSetSInt)
+
+  io.data := 0.S
+  when (io.ena) {
+    when (io.addr < OSBIAS.U) {
+      io.data := weightsROM(io.addr - OSWEIGHT.U) //TODO: try to do this without subtracting
+
+    }.elsewhen(io.addr < OSDECAY.U) {
+      io.data := biasesROM(io.addr - OSBIAS.U)
+
+    }.elsewhen(io.addr < OSTHRESH.U) {
+      io.data := decaysROM(io.addr - OSDECAY.U)
+
+    }.elsewhen(io.addr < OSREFRACSET.U) {
+      io.data := thresholdsROM(io.addr - OSTHRESH.U)
+
+    }.elsewhen(io.addr < OSPOTSET.U) {
+      io.data := refracSetsROM(io.addr - OSREFRACSET.U)
+
+    }.otherwise {
+      io.data := potentialSetROM(io.addr - OSPOTSET.U)
+    }
+  }
+
+  }
+
+object PROM extends App {
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new PROM(4,0))
 }
 
 class ControlUnit(coreID : Int) extends Module {
