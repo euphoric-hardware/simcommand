@@ -4,7 +4,7 @@ import Constants._
 
 
 
-class NeumProcTop extends Module{
+class NeuromorphicProcessor extends Module{
   val io = IO(new Bundle{
     val uartTx = Output(Bool())
     val uartRx = Input(Bool())
@@ -74,6 +74,6 @@ class NeumProcTop extends Module{
 
 }
 
-object NeumProcTop extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new NeumProcTop)
+object NeuromorphicProcessor extends App {
+  chisel3.Driver.execute(Array("--target-dir", "build"), () => new NeuromorphicProcessor)
 }
