@@ -14,8 +14,8 @@ class NeuromorphicProcessor extends Module{
 
   //Cores
   val inCores = (0 until 2).map(i => Module(new InputCore(i)))
-  val neuCores = (2 until 6).map(i => Module(new NeuronCore(i)))
-  val outCore = Module(new OutputCore(6))
+  val neuCores = (2 until 4).map(i => Module(new NeuronCore(i)))
+  val outCore = Module(new OutputCore(4))
   
 
   // connecting off chip communication to in/output cores and UART port
@@ -48,7 +48,7 @@ class NeuromorphicProcessor extends Module{
   //Connecting cores to the  communication fabric
   dataBusOr(0) := inCores(0).io.tx | inCores(1).io.tx
   for (i <- 1 until CORES - 1){
-    if(i < 5){
+    if(i < 3){
       dataBusOr(i) := dataBusOr(i-1) | neuCores(i-1).io.tx
     }else{
       dataBusOr(i) := dataBusOr(i-1) | outCore.io.tx
@@ -61,7 +61,7 @@ class NeuromorphicProcessor extends Module{
       inCores(i).io.rx        := busTx
       busArbiter.io.reqs(i) := inCores(i).io.req
       inCores(i).io.grant     := busArbiter.io.grants(i)
-    }else if(i<6){
+    }else if(i<4){
       neuCores(i-2).io.rx        := busTx
       busArbiter.io.reqs(i) := neuCores(i-2).io.req
       neuCores(i-2).io.grant     := busArbiter.io.grants(i)

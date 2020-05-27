@@ -39,11 +39,7 @@ class OutputCore(coreID : Int) extends Module{
 
   when (interface.io.valid){
     offCCValid := true.B
-    when (interface.io.axonID(AXONIDWIDTH-1,AXONIDWIDTH-2) === 0.U){
-      offCCData := interface.io.axonID(7,0)
-    }.otherwise{
-      offCCData := interface.io.axonID(7,0) + 100.U //the first 100 output neurons are in core 2 the next 100 in core 3
-    }
+    offCCData := interface.io.axonID(7,0)
   }.elsewhen(offCCValid && io.offCCReady){
     offCCValid := false.B
   }

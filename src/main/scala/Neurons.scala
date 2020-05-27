@@ -2,6 +2,7 @@ import chisel3._
 import chisel3.util._
 import Constants._
 import spray.json._
+import chisel3.util.experimental.loadMemoryFromFile
 
 /*NOTES
 Look through this design again
@@ -157,7 +158,8 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
   
   //Hardcoded mapping for showcase network
   val pROM = Module(new PROM(coreID, evalID))
-  val romRead = RegInit(0.S(NEUDATAWIDTH.W))
+  //val romRead = RegInit(0.S(NEUDATAWIDTH.W))
+  val romRead = Wire(SInt(NEUDATAWIDTH.W))
   val romEna = Wire(Bool())
 
 
@@ -191,8 +193,49 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
 
 }
 
+class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
+  val io = IO(new Bundle {
+    val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
+    val wr        = Input(Bool()) //false: read, true: write
+    val ena       = Input(Bool())
+    val readData  = Output(SInt(NEUDATAWIDTH.W))
+    val writeData = Input(SInt(NEUDATAWIDTH.W))
+    val nothing   = Output(UInt())
+  }
+  )
+
+  io.nothing := coreID.U ## evalID.U
+
+  val eMem             = SyncReadMem(EVALMEMSIZEC, SInt(NEUDATAWIDTH.W))
+  val memRead          = Wire(SInt(NEUDATAWIDTH.W))
+  val syncOut          = RegInit(false.B)
+
+  eMem.suggestName("eMem"+coreID.toString+"e"+ evalID.toString)
+
+  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".hex")
+  //Hardcoded mapping for showcase network
+
+  //default assignment 
+  memRead := 0.S
+  syncOut := false.B
+
+  when(io.ena) {
+    val rdwrPort = eMem(io.addr)
+    when(io.wr) {
+      rdwrPort := io.writeData
+    }.otherwise {
+      syncOut := true.B
+      memRead := rdwrPort
+    }
+  }
+
+  io.readData := memRead
+
+
+}
+
 object OneMem extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new EvaluationMemory(4,0))
+  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new EvaluationMemory2(2,0))
 }
 
 class PROM(coreID : Int, evalID : Int) extends Module{
@@ -232,22 +275,29 @@ class PROM(coreID : Int, evalID : Int) extends Module{
   io.data := 0.S
   when (io.ena) {
     when (io.addr < OSBIAS.U) {
-      io.data := weightsROM(io.addr - OSWEIGHT.U) //TODO: try to do this without subtracting
+    /*  for ((value,index) <- weights.zipWithIndex) {
+        if (value != 0){
+          when(io.addr - OSWEIGHT.U === index.U){
+            io.data := weightsROM(io.addr - OSWEIGHT.U)
+          }
+        }
+      }*/
+    io.data := RegNext(weightsROM(io.addr - OSWEIGHT.U)) //TODO: try to do this without subtracting
 
     }.elsewhen(io.addr < OSDECAY.U) {
-      io.data := biasesROM(io.addr - OSBIAS.U)
+      io.data := RegNext(biasesROM(io.addr - OSBIAS.U))
 
     }.elsewhen(io.addr < OSTHRESH.U) {
-      io.data := decaysROM(io.addr - OSDECAY.U)
+      io.data := RegNext(decaysROM(io.addr - OSDECAY.U))
 
     }.elsewhen(io.addr < OSREFRACSET.U) {
-      io.data := thresholdsROM(io.addr - OSTHRESH.U)
+      io.data := RegNext(thresholdsROM(io.addr - OSTHRESH.U))
 
     }.elsewhen(io.addr < OSPOTSET.U) {
-      io.data := refracSetsROM(io.addr - OSREFRACSET.U)
+      io.data := RegNext(refracSetsROM(io.addr - OSREFRACSET.U))
 
     }.otherwise {
-      io.data := potentialSetROM(io.addr - OSPOTSET.U)
+      io.data := RegNext(potentialSetROM(io.addr - OSPOTSET.U))
     }
   }
 
@@ -550,7 +600,7 @@ class Neurons(coreID: Int) extends Module {
 
   val controlUnit = Module(new ControlUnit(coreID))
   val evalUnits   = (0 until EVALUNITS).map(i => Module(new NeuronEvaluator))
-  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory(coreID, i)))
+  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory2(coreID, i)))
 
   io.inOut                := controlUnit.io.inOut
   controlUnit.io.spikeCnt := io.spikeCnt
