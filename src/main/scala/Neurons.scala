@@ -128,7 +128,11 @@ class NeuronEvaluator extends Module {
     }
     is(2.U) {
       when(io.refracIndi) {
+        when(spikeIndiReg){
+          io.dataOut := io.dataIn
+        }.otherwise{
         io.dataOut := refracCntReg
+        }
       }.otherwise {
         io.dataOut := refracCntReg - 1.S
       }
