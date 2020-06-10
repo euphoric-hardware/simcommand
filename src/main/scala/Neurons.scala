@@ -3,6 +3,7 @@ import chisel3.util._
 import Constants._
 import spray.json._
 import chisel3.util.experimental.loadMemoryFromFile
+import firrtl.annotations.MemoryLoadFileType
 
 /*NOTES
 Look through this design again
@@ -216,7 +217,7 @@ class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
 
   eMem.suggestName("eMem"+coreID.toString+"e"+ evalID.toString)
 
-  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".hex")
+  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem")
   //Hardcoded mapping for showcase network
 
   //default assignment 
