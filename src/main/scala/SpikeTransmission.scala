@@ -17,7 +17,7 @@ class TransmissionSystem(coreID: Int) extends Module {
 
   val spikeRegs    = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))
   val neuronIdLSB  = RegInit(VecInit(Seq.fill(EVALUNITS)(0.U(N.W))))
-  val maskRegs     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))
+  val maskRegs     = RegInit(VecInit(Seq.fill(EVALUNITS)(true.B)))
 
   val spikeEncoder = Module(new PriorityMaskRstEncoder)
   val encoderReqs  = Wire(Vec(EVALUNITS, Bool()))
@@ -31,8 +31,11 @@ class TransmissionSystem(coreID: Int) extends Module {
 
 
   for (i <- 0 to EVALUNITS - 1) {
+
     when(io.ready) {
       maskRegs(i) := spikeEncoder.io.mask(i)
+    }.elsewhen(!spikeEncoder.io.valid){// prevent deadlock
+      maskRegs(i) := true.B
     }
 
     encoderReqs(i) := maskRegs(i) && spikeRegs(i)
@@ -51,7 +54,7 @@ class TransmissionSystem(coreID: Int) extends Module {
     }
 
     when(i.U === spikeEncoder.io.value) {
-      io.data := coreID.U(log2Up(CORES).W) ## spikeEncoder.io.value ## neuronIdLSB(i)
+      io.data := coreID.U(log2Up(CORES).W) ## neuronIdLSB(i) ## spikeEncoder.io.value 
     }
   }
 
