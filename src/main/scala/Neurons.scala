@@ -53,8 +53,8 @@ class NeuronEvaluator extends Module {
 
   // saturation
   sumSat := sum
-  when(sum < 0.S){
-    sumSat := 0.S
+  when(sum < (0-(scala.math.pow(2,NEUDATAWIDTH-1))).asInstanceOf[Int].S){
+    sumSat := (0-(scala.math.pow(2,NEUDATAWIDTH-1))).asInstanceOf[Int].S
   }.elsewhen(sum > (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S){
     sumSat := (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S
   }
