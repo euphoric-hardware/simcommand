@@ -184,8 +184,14 @@ object MakeDataFiles extends App{
 
     return binStr
   }
-  val params = new ParameterReader
 
+  def toHex(x : Int, len : Int): String = {
+    var binStr = x.toHexString
+    return binStr
+  }
+
+  val params = new ParameterReader
+  val hex = false
   val potNrefrac = Array.fill(OSWEIGHT)(0).toVector
 
 
@@ -199,11 +205,14 @@ object MakeDataFiles extends App{
       val potentialSet     = params.getMemData("reset", i, j)
 
       val filedata = potNrefrac ++ weights ++ biases ++ decays ++ thresholds ++ refracSets ++ potentialSet
-      println("whatup")
       val file1 = new PrintWriter(new File("mapping/evaldata"+"c"+i.toString+"e"+j.toString+".mem" ))
 
       for (d <- filedata){
+        if(hex){
+          file1.write(toHex(d, 17) + "\n")
+        }else{
         file1.write(toBinary(d, 17) + "\n")
+      }
       }
 
       file1.close
