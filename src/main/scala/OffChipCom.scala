@@ -39,7 +39,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   val phase = RegInit(false.B) // Init to in phase. download first
 
   val byteCnt = RegInit(0.U(2.W))
-  val pixCnt = RegInit(0.U(log2Up(INPUTSIZE)))
+  val pixCnt = RegInit(0.U(log2Up(INPUTSIZE).W))
 
   val inC0V = RegInit(false.B)
   val inC1V = RegInit(false.B)
@@ -87,7 +87,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   switch(stateReg) { //This FSM controls revieving of rates
     is(idle) {//TODO how to start receiving
       when(phase === io.inC0HSin && io.inC0HSin === io.inC1HSin) { // in phase means we can sent
-        stateReg := stateReg
+        stateReg := start
       }
     }
     is(start) {
