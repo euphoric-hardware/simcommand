@@ -5,12 +5,6 @@ import spray.json._
 import chisel3.util.experimental.loadMemoryFromFile
 import firrtl.annotations.MemoryLoadFileType
 
-/*NOTES
-Look through this design again
-
-Controls har done by the big control unit.
-
-NOTES*/
 
 
 class EvalCntrSigs() extends Bundle() {
@@ -41,14 +35,14 @@ class NeuronEvaluator extends Module {
   val refracRegNext = Wire(SInt(NEUDATAWIDTH.W))
   val potDecay      = Wire(SInt(NEUDATAWIDTH.W))
 
-  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W)) //TODO consider SInt
+  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W)) 
   val refracCntReg  = RegNext(refracRegNext)
   val spikeIndiReg  = RegInit(false.B)
 
   //default assignment
   io.dataOut := io.dataIn
   sumIn1     := membPotReg
-  sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) // TODO - check that -potdecay can be done - Should be ok
+  sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) 
   sum        := sumIn1 + sumIn2
 
 
@@ -132,7 +126,7 @@ class NeuronEvaluator extends Module {
         when(spikeIndiReg){
           io.dataOut := io.dataIn
         }.otherwise{
-        io.dataOut := refracCntReg
+          io.dataOut := refracCntReg
         }
       }.otherwise {
         io.dataOut := refracCntReg - 1.S
@@ -243,7 +237,7 @@ object OneMem extends App {
   chisel3.Driver.execute(Array("--target-dir", "build/"), () => new EvaluationMemory2(2,0))
 }
 
-class PROM(coreID : Int, evalID : Int) extends Module{
+class PROM(coreID : Int, evalID : Int) extends Module{ // Deprecated
 
   val io = IO(new Bundle{
     val ena       = Input(Bool())
@@ -407,9 +401,9 @@ class ControlUnit(coreID : Int) extends Module {
   //set evaluations units active state. (Usure still when all mapped neurons are evaluated)
   for(i <- 0 until EVALUNITS) {
       evalUnitActive(i) := nrNeuMapped > ((n << log2Up(EVALUNITS)) + i.U)
-    }
+  }
 
-  switch(stateReg) {
+  switch(stateReg) { 
     is(idle) { //in sim 0
       nNext := 0.U
       aNext := 0.U
@@ -454,7 +448,7 @@ class ControlUnit(coreID : Int) extends Module {
         localCntrSels(i).potSel := 0.U
       }
 
-      when(spikeCnt === 0.U) {
+      when(spikeCnt === 0.U) { 
         stateReg := rBias
       }.otherwise {
         stateReg := rWeight1
@@ -516,7 +510,7 @@ class ControlUnit(coreID : Int) extends Module {
       addrSpecific := n
 
       when(spikeCnt === 0.U) {
-        for (i <- 0 until EVALUNITS) {
+        for (i <- 0 until EVALUNITS) { 
           when(io.refracIndi(i)) {
             localCntrSels(i).potSel   := 1.U
             localCntrSels(i).decaySel := true.B
@@ -543,7 +537,7 @@ class ControlUnit(coreID : Int) extends Module {
           localCntrSels(i).potSel := 1.U
         }
       }
-
+      
       stateReg := rRefracSet
 
     }
