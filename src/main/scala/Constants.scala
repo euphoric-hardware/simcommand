@@ -33,7 +33,7 @@ object Constants {
 
   //offsets
   val OSREFRAC    = 0
-  val OSPOTENTIAL = TMNEURONS
+  val OSPOTENTIAL = TMNEURONS 
   val OSWEIGHT    = 2 * TMNEURONS
   val OSBIAS      = if (MEMCHEAT) (2 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (2 * TMNEURONS + TMNEURONS * AXONNR)
   val OSDECAY     = if (MEMCHEAT) (3 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (3 * TMNEURONS + TMNEURONS * AXONNR)
@@ -211,8 +211,8 @@ object MakeDataFiles extends App{
         if(hex){
           file1.write(toHex(d, 17) + "\n")
         }else{
-        file1.write(toBinary(d, 17) + "\n")
-      }
+          file1.write(toBinary(d, 17) + "\n")
+        }
       }
 
       file1.close
