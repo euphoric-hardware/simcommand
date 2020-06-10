@@ -168,7 +168,7 @@ class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
 
 
   //default assignment 
-  memRead := 0.S
+  memRead := DontCare
   syncOut := false.B
   romEna := false.B
 
@@ -220,7 +220,7 @@ class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
   //Hardcoded mapping for showcase network
 
   //default assignment 
-  memRead := 0.S
+  memRead := DontCare
   syncOut := false.B
 
   when(io.ena) {
