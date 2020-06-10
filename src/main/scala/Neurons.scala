@@ -334,7 +334,7 @@ class ControlUnit(coreID : Int) extends Module {
   }
   )
 
-  val idle :: rRefrac :: rPot :: rWeight1 :: rWeight2 :: rBias :: rDecay :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(12)
+  val idle :: rRefrac :: rPot :: rDecay :: rWeight1 :: rWeight2 :: rBias :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(12)
   val stateReg = RegInit(idle)
 
   val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
@@ -343,6 +343,7 @@ class ControlUnit(coreID : Int) extends Module {
   val n              = RegNext(nNext) // time multiplex evaluation counter
   val aNext          = Wire(UInt(AXONIDWIDTH.W))
   val a              = RegNext(aNext) //axon system addr counter
+  val aLate          = RegNext(a) //axon system addr counter
   val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
   val inOut          = RegInit(false.B) //used to inform spike system of new timestep
   val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit have evaluated all mapped neurons
@@ -372,7 +373,7 @@ class ControlUnit(coreID : Int) extends Module {
       io.cntrSels(i).writeDataSel := localCntrSels(i).writeDataSel
       io.cntrSels(i).decaySel     := localCntrSels(i).decaySel
     }.otherwise{
-      io.cntrSels(i).potSel       := 2.U //TODO Check these defaults
+      io.cntrSels(i).potSel       := 2.U 
       io.cntrSels(i).spikeSel     := 2.U
       io.cntrSels(i).refracSel    := 1.U
       io.cntrSels(i).writeDataSel := 0.U
@@ -409,7 +410,7 @@ class ControlUnit(coreID : Int) extends Module {
     }
 
   switch(stateReg) {
-    is(idle) {
+    is(idle) { //in sim 0
       nNext := 0.U
       aNext := 0.U
       when(tsCycleCnt === 0.U) {
@@ -418,7 +419,7 @@ class ControlUnit(coreID : Int) extends Module {
         stateReg := rRefrac
       }
     }
-    is(rRefrac) {
+    is(rRefrac) {//in sim 1
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSREFRAC.U
@@ -430,7 +431,7 @@ class ControlUnit(coreID : Int) extends Module {
 
       stateReg := rPot
     }
-    is(rPot) {
+    is(rPot) {//in sim 2
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSPOTENTIAL.U
@@ -439,6 +440,19 @@ class ControlUnit(coreID : Int) extends Module {
       for (i <- 0 until EVALUNITS) {
         localCntrSels(i).refracSel := 0.U
       }
+      stateReg := rDecay
+    }
+    is(rDecay) {//in sim 3
+      io.ena       := true.B
+      io.wr        := false.B
+      addrOffset   := OSDECAY.U
+      addrSpecific := n
+
+      aNext := a + 1.U
+
+      for (i <- 0 until EVALUNITS) {
+        localCntrSels(i).potSel := 0.U
+      }
 
       when(spikeCnt === 0.U) {
         stateReg := rBias
@@ -446,44 +460,56 @@ class ControlUnit(coreID : Int) extends Module {
         stateReg := rWeight1
       }
     }
-    is(rWeight1) {
+
+    is(rWeight1) {//in sim 4
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSWEIGHT.U
-      addrSpecific := n ## io.aData //TODO VERIFY THIS WORKS CONCATINATION
-
-      for (i <- 0 until EVALUNITS) {
-        localCntrSels(i).potSel := 0.U
+      if (MEMCHEAT) {
+        addrSpecific := (n * (3*256).U) + io.aData 
+      } else {
+        addrSpecific := n ## io.aData 
       }
 
       aNext := a + 1.U
 
-      when(spikeCnt === aNext) { //TODO CHECK EDGE CASE
+      for (i <- 0 until EVALUNITS) { 
+        when(io.refracIndi(i)) {
+          localCntrSels(i).potSel   := 1.U
+          localCntrSels(i).decaySel := true.B
+        }
+      }
+
+      when(spikeCnt === a) { 
         stateReg := rBias
       }.otherwise {
         stateReg := rWeight2
       }
     }
-    is(rWeight2) {
+    is(rWeight2) {//in sim 5
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSWEIGHT.U
-      addrSpecific := n ## io.aData //TODO VERIFY THIS WORKS
+      if (MEMCHEAT) {
+        addrSpecific := (n * (3*256).U) + io.aData 
+      } else {
+        addrSpecific := n ## io.aData 
+      }
 
       for (i <- 0 until EVALUNITS) {
-        when(!io.refracIndi(i)) {
+        when(io.refracIndi(i)) {
           localCntrSels(i).potSel := 1.U
         }
       }
       aNext := a + 1.U
 
-      when(spikeCnt === aNext) { //TODO CHECK EDGE CASE
+      when(spikeCnt === a) { 
         stateReg := rBias
       }.otherwise {
         stateReg := rWeight2
       }
     }
-    is(rBias) {
+    is(rBias) {//in sim 6
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSBIAS.U
@@ -491,50 +517,37 @@ class ControlUnit(coreID : Int) extends Module {
 
       when(spikeCnt === 0.U) {
         for (i <- 0 until EVALUNITS) {
-          localCntrSels(i).potSel := 0.U
+          when(io.refracIndi(i)) {
+            localCntrSels(i).potSel   := 1.U
+            localCntrSels(i).decaySel := true.B
+          }
         }
       }.otherwise {
         for (i <- 0 until EVALUNITS) {
-          when(!io.refracIndi(i)) {
+          when(io.refracIndi(i)) {
             localCntrSels(i).potSel := 1.U
           }
         }
       }
 
-      stateReg := rDecay
-    }
-    is(rDecay) {
-      io.ena       := true.B
-      io.wr        := false.B
-      addrOffset   := OSDECAY.U
-      addrSpecific := n
-
-      for (i <- 0 until EVALUNITS) {
-        when(!io.refracIndi(i)) {
-          localCntrSels(i).potSel := 1.U
-        }
-      }
-
       stateReg := rThresh
-
     }
-    is(rThresh) {
+    is(rThresh) {//in sim 7
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSTHRESH.U
       addrSpecific := n
 
-      for (i <- 0 until EVALUNITS) { //TODO make sure that we can subtract we probs need to convert all to SINT
-        when(!io.refracIndi(i)) {
-          localCntrSels(i).potSel   := 1.U
-          localCntrSels(i).decaySel := true.B
+      for (i <- 0 until EVALUNITS) {
+        when(io.refracIndi(i)) {
+          localCntrSels(i).potSel := 1.U
         }
       }
 
       stateReg := rRefracSet
 
     }
-    is(rRefracSet) {
+    is(rRefracSet) {//in sim 8
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSREFRACSET.U
@@ -542,12 +555,11 @@ class ControlUnit(coreID : Int) extends Module {
 
       for (i <- 0 until EVALUNITS) {
         localCntrSels(i).spikeSel := 0.U
-        spikePulse(i) := io.spikeIndi(i)
       }
 
       stateReg := wRefrac
     }
-    is(wRefrac) {
+    is(wRefrac) {//in sim 9
       io.ena       := true.B
       io.wr        := true.B
       addrOffset   := OSREFRAC.U
@@ -555,12 +567,13 @@ class ControlUnit(coreID : Int) extends Module {
 
       for (i <- 0 until EVALUNITS) {
         localCntrSels(i).writeDataSel := 2.U
+        spikePulse(i) := io.spikeIndi(i)
       }
 
       stateReg := rPotSet
 
     }
-    is(rPotSet) {
+    is(rPotSet) {//in sim A
       io.ena       := true.B
       io.wr        := false.B
       addrOffset   := OSPOTSET.U
@@ -568,7 +581,7 @@ class ControlUnit(coreID : Int) extends Module {
 
       stateReg     := wPot
     }
-    is(wPot) {
+    is(wPot) { //in sim B
       io.ena       := true.B
       io.wr        := true.B
       addrOffset   := OSPOTENTIAL.U
