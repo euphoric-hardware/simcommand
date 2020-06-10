@@ -120,7 +120,7 @@ class InputCore(coreID : Int) extends Module{
   when(ts === 0.U || cntrRateData === 0.U){
     modRes := 1.U
   }.otherwise{
-  modRes := ts % cntrRateData //TODO what about modulus with 0
+    modRes := ts % cntrRateData //TODO what about modulus with 0
   }
 
   switch(stateReg) {
