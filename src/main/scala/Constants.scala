@@ -11,9 +11,11 @@ object Constants {
   val BAUDRATE         = 115200
   val TIMESTEP         = 1000 //micro seconds
   val CYCLESPRSTEP     = FREQ / TIMESTEP
+  val MEMCHEAT         = true // make memories smaller to fit Kintex-7
   val CORES            = 5
   val NEUDATAWIDTH     = 17
   val AXONNR           = 1024
+  val AXONNRCHEAT      = 256*3
   val AXONIDWIDTH      = log2Up(AXONNR)
   val TMNEURONS        = 32
   val N                = log2Up(TMNEURONS)
@@ -33,14 +35,14 @@ object Constants {
   val OSREFRAC    = 0
   val OSPOTENTIAL = TMNEURONS
   val OSWEIGHT    = 2 * TMNEURONS
-  val OSBIAS      = 2 * TMNEURONS + TMNEURONS * AXONNR
-  val OSDECAY     = 3 * TMNEURONS + TMNEURONS * AXONNR
-  val OSTHRESH    = 4 * TMNEURONS + TMNEURONS * AXONNR
-  val OSREFRACSET = 5 * TMNEURONS + TMNEURONS * AXONNR
-  val OSPOTSET    = 6 * TMNEURONS + TMNEURONS * AXONNR
+  val OSBIAS      = if (MEMCHEAT) (2 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (2 * TMNEURONS + TMNEURONS * AXONNR)
+  val OSDECAY     = if (MEMCHEAT) (3 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (3 * TMNEURONS + TMNEURONS * AXONNR)
+  val OSTHRESH    = if (MEMCHEAT) (4 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (4 * TMNEURONS + TMNEURONS * AXONNR)
+  val OSREFRACSET = if (MEMCHEAT) (5 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (5 * TMNEURONS + TMNEURONS * AXONNR)
+  val OSPOTSET    = if (MEMCHEAT) (6 * TMNEURONS + TMNEURONS * AXONNRCHEAT) else (6 * TMNEURONS + TMNEURONS * AXONNR)
 
   //Hardcoded - consider chancing to be part of conf files or similar
-  val neuronsInCore = Array(256, 228, 100, 100, 100, 100, 200) // Neurons mapped to each core, in/outcores doesnt matter as they are used controlunit in neuron core
+  val neuronsInCore = Array(256, 228, 200, 200, 200) // Neurons mapped to each core, in/outcores doesnt matter as they are used controlunit in neuron core
 }
 
 class ParameterReader { //Only for showcase
