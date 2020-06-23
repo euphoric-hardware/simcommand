@@ -16,7 +16,7 @@ class TransmissionSystem(coreID: Int) extends Module {
   )
 
   val spikeRegs    = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))
-  val neuronIdLSB  = RegInit(VecInit(Seq.fill(EVALUNITS)(0.U(N.W))))
+  val neuronIdMSB  = RegInit(VecInit(Seq.fill(EVALUNITS)(0.U(N.W))))
   val maskRegs     = RegInit(VecInit(Seq.fill(EVALUNITS)(true.B)))
 
   val spikeEncoder = Module(new PriorityMaskRstEncoder)
@@ -44,7 +44,7 @@ class TransmissionSystem(coreID: Int) extends Module {
     spikeUpdate(i) := rstReadySel(i) && spikeRegs(i)
 
     when(~spikeUpdate(i)) {
-      neuronIdLSB(i) := io.n
+      neuronIdMSB(i) := io.n
 
       when(io.spikes(i)) {
         spikeRegs(i) := true.B
@@ -54,7 +54,7 @@ class TransmissionSystem(coreID: Int) extends Module {
     }
 
     when(i.U === spikeEncoder.io.value) {
-      io.data := coreID.U(log2Up(CORES).W) ## neuronIdLSB(i) ## spikeEncoder.io.value 
+      io.data := coreID.U(log2Up(CORES).W) ## neuronIdMSB(i) ## spikeEncoder.io.value 
     }
   }
 
