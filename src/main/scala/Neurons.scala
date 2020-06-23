@@ -35,7 +35,7 @@ class NeuronEvaluator extends Module {
   val refracRegNext = Wire(SInt(NEUDATAWIDTH.W))
   val potDecay      = Wire(SInt(NEUDATAWIDTH.W))
 
-  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W)) 
+  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W))
   val refracCntReg  = RegNext(refracRegNext)
   val spikeIndiReg  = RegInit(false.B)
 
@@ -497,7 +497,7 @@ class ControlUnit(coreID : Int) extends Module {
       }
       aNext := a + 1.U
 
-      when(spikeCnt === a) { 
+      when(spikeCnt === a - 1.U) { 
         stateReg := rBias
       }.otherwise {
         stateReg := rWeight2
