@@ -9,8 +9,8 @@ import scala.math.pow
 object Constants {
   val FREQ             = 80000000 //in Hz
   val BAUDRATE         = 115200
-  val TIMESTEP         = 1000 //micro seconds
-  val CYCLESPRSTEP     = FREQ / TIMESTEP
+  val TIMESTEP         = 0.001 //in seconds
+  val CYCLESPRSTEP     = (FREQ*TIMESTEP).toInt
   val MEMCHEAT         = true // make memories smaller to fit Kintex-7
   val CORES            = 5
   val NEUDATAWIDTH     = 17
@@ -23,7 +23,7 @@ object Constants {
   val NEURONSPRCORE    = TMNEURONS * EVALUNITS
   val GLOBALADDRWIDTH  = log2Up(CORES) + log2Up(EVALUNITS) + N
   val AXONMSBWIDTH     = AXONIDWIDTH - log2Up(NEURONSPRCORE)
-  val EVALMEMSIZE      = (7 * TMNEURONS + TMNEURONS * AXONNR) 
+  val EVALMEMSIZE      = if (MEMCHEAT) (7 * TMNEURONS + TMNEURONS * 768) else (7 * TMNEURONS + TMNEURONS * AXONNR)
   val EVALMEMADDRWIDTH = log2Up(EVALMEMSIZE)
   val EVALMEMSIZEC      = (7 * TMNEURONS + TMNEURONS * 768)//Cheating to fit to board 
   val EVALMEMADDRWIDTHC = log2Up(EVALMEMSIZEC)
