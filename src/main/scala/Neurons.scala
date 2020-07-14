@@ -24,20 +24,23 @@ class NeuronEvaluator extends Module {
     val refracIndi = Output(Bool())
 
     val cntrSels   = Input(new EvalCntrSigs())
+    val evalEnable = Input(Bool())
   }
   )
 
   //internal signals:
-  val sum           = Wire(SInt((NEUDATAWIDTH+1).W))
-  val sumSat        = Wire(SInt(NEUDATAWIDTH.W))
-  val sumIn1        = Wire(SInt((NEUDATAWIDTH+1).W))
-  val sumIn2        = Wire(SInt((NEUDATAWIDTH+1).W))
-  val refracRegNext = Wire(SInt(NEUDATAWIDTH.W))
-  val potDecay      = Wire(SInt(NEUDATAWIDTH.W))
+  val sum              = Wire(SInt((NEUDATAWIDTH+1).W))
+  val sumSat           = Wire(SInt(NEUDATAWIDTH.W))
+  val sumIn1           = Wire(SInt((NEUDATAWIDTH+1).W))
+  val sumIn2           = Wire(SInt((NEUDATAWIDTH+1).W))
+  val refracRegNext    = Wire(SInt(NEUDATAWIDTH.W))
+  val potDecay         = Wire(SInt(NEUDATAWIDTH.W)) //regEnable only works with a next declaration
+  val membPotRegNext   = Wire(SInt(NEUDATAWIDTH.W))
+  val spikeIndiRegNext = Wire(Bool())
 
-  val membPotReg    = RegInit(0.S(NEUDATAWIDTH.W))
-  val refracCntReg  = RegNext(refracRegNext)
-  val spikeIndiReg  = RegInit(false.B)
+  val membPotReg    = RegEnable(membPotRegNext, 0.S(NEUDATAWIDTH.W), io.evalEnable) //regEnable only works with a next declaration
+  val refracCntReg  = RegEnable(refracRegNext, io.evalEnable)
+  val spikeIndiReg  = RegEnable(spikeIndiRegNext, false.B, io.evalEnable)
 
   //default assignment
   io.dataOut := io.dataIn
@@ -45,6 +48,8 @@ class NeuronEvaluator extends Module {
   sumIn2     := Mux(io.cntrSels.decaySel, -potDecay, io.dataIn) 
   sum        := sumIn1 + sumIn2
 
+  membPotRegNext   := membPotReg
+  spikeIndiRegNext := spikeIndiReg
 
   // saturation
   sumSat := sum
@@ -57,13 +62,13 @@ class NeuronEvaluator extends Module {
 
   switch(io.cntrSels.potSel) {
     is(0.U) {
-      membPotReg := io.dataIn
+      membPotRegNext := io.dataIn
     }
     is(1.U) {
-      membPotReg := sumSat
+      membPotRegNext := sumSat
     }
     is(2.U) {
-      membPotReg := membPotReg
+      membPotRegNext := membPotReg
     }
   }
 
@@ -103,10 +108,10 @@ class NeuronEvaluator extends Module {
 
   switch(io.cntrSels.spikeSel) {
     is(0.U) {
-      spikeIndiReg := membPotReg > io.dataIn
+      spikeIndiRegNext := membPotReg > io.dataIn
     }
     is(1.U) {
-      spikeIndiReg := false.B
+      spikeIndiRegNext := false.B
     }
   } //otherwise keeps its value
 
@@ -202,19 +207,18 @@ class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
     val nothing   = Output(UInt())
   }
   )
-
   io.nothing := coreID.U ## evalID.U
 
-  val eMem             = SyncReadMem(EVALMEMSIZEC, SInt(NEUDATAWIDTH.W))
+  val eMem             = SyncReadMem(EVALMEMSIZE, SInt(NEUDATAWIDTH.W))
   val memRead          = Wire(SInt(NEUDATAWIDTH.W))
   val syncOut          = RegInit(false.B)
 
   eMem.suggestName("eMem"+coreID.toString+"e"+ evalID.toString)
 
-  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem")
   //Hardcoded mapping for showcase network
+  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem") //Only initializes for simulation.
 
-  //default assignment 
+  //default assignment
   memRead := DontCare
   syncOut := false.B
 
@@ -227,10 +231,7 @@ class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
       memRead := rdwrPort
     }
   }
-
   io.readData := memRead
-
-
 }
 
 object OneMem extends App {
@@ -316,6 +317,7 @@ class ControlUnit(coreID : Int) extends Module {
     val spikeIndi  = Input(Vec(EVALUNITS, Bool()))
     val refracIndi = Input(Vec(EVALUNITS, Bool()))
     val cntrSels   = Output(Vec(EVALUNITS, new EvalCntrSigs()))
+    val evalEnable  = Output(Bool())
     //For axon system
     val inOut      = Output(Bool())
     val spikeCnt   = Input(UInt(AXONIDWIDTH.W))
@@ -376,12 +378,14 @@ class ControlUnit(coreID : Int) extends Module {
 
     io.spikes(i)                := spikePulse(i)
   }
+  io.evalEnable := true.B
+
   io.addr      := evalAddr
   io.wr        := false.B
   io.ena       := false.B
   io.inOut     := inOut
   io.aAddr     := a
-  io.aEna      := true.B
+  io.aEna      := false.B
   io.n         := n
        
   nNext        := n
@@ -407,6 +411,7 @@ class ControlUnit(coreID : Int) extends Module {
     is(idle) { //in sim 0
       nNext := 0.U
       aNext := 0.U
+      io.evalEnable := false.B
       when(tsCycleCnt === 0.U) {
         spikeCnt := io.spikeCnt
         inOut    := ~inOut
@@ -443,6 +448,7 @@ class ControlUnit(coreID : Int) extends Module {
       addrSpecific := n
 
       aNext := a + 1.U
+      io.aEna := true.B
 
       for (i <- 0 until EVALUNITS) {
         localCntrSels(i).potSel := 0.U
@@ -464,7 +470,7 @@ class ControlUnit(coreID : Int) extends Module {
       } else {
         addrSpecific := n ## io.aData 
       }
-
+      io.aEna := true.B
       aNext := a + 1.U
 
       for (i <- 0 until EVALUNITS) { 
@@ -496,6 +502,7 @@ class ControlUnit(coreID : Int) extends Module {
         }
       }
       aNext := a + 1.U
+      io.aEna := true.B
 
       when(spikeCnt === a - 1.U) { 
         stateReg := rBias
@@ -634,6 +641,7 @@ class Neurons(coreID: Int) extends Module {
     evalUnits(i).io.cntrSels.refracSel    := controlUnit.io.cntrSels(i).refracSel
     evalUnits(i).io.cntrSels.writeDataSel := controlUnit.io.cntrSels(i).writeDataSel
     evalUnits(i).io.cntrSels.decaySel     := controlUnit.io.cntrSels(i).decaySel
+    evalUnits(i).io.evalEnable            := controlUnit.io.evalEnable
 
     evalMems(i).io.addr                   := controlUnit.io.addr
     evalMems(i).io.wr                     := controlUnit.io.wr
