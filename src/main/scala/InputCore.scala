@@ -17,7 +17,11 @@ class InputCore(coreID : Int) extends Module{
     val req   = Output(Bool())
     val tx    = Output(UInt(GLOBALADDRWIDTH.W))
     val rx    = Input(UInt(GLOBALADDRWIDTH.W))
+
+    val nothing = Output(UInt())
   })
+  io.nothing := coreID.U
+
   
   io.offCCReady := true.B //due to dual memory always ready
 
@@ -40,7 +44,7 @@ class InputCore(coreID : Int) extends Module{
   val pixcntLate   = RegNext(pixcnt)
   val pixcntLater  = RegNext(pixcntLate)
   val tsCycleCnt   = RegInit(CYCLESPRSTEP.U)                         //count time step cycles down to 0
-  val phase        = RegInit(false.B)                                // Init to in phase. download first
+  val phase        = RegInit(true.B)                                // Init to in phase. download first
   val cntrEna      = WireDefault(false.B)
   val cntrRateData = Wire(UInt(RATEWIDTH.W))
   val spikePulse   = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))  // used to deliver spike pulses to transmission
@@ -58,6 +62,7 @@ class InputCore(coreID : Int) extends Module{
   val addr0    = Wire(UInt(RATEADDRWIDTH.W))
   val rateMem0 = SyncReadMem(TMNEURONS * EVALUNITS, UInt(RATEWIDTH.W))
 
+  rateMem0.suggestName("rateMem0"+coreID.toString)
   rdata0 := DontCare
   when(ena0) {
     val rdwrPort0 = rateMem0(addr0)
