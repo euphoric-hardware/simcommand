@@ -1,95 +1,73 @@
-import chisel3.iotesters.PeekPokeTester
+import neuroproc._
+
 import org.scalatest._
+import chisel3._
+import chiseltest._
+import chiseltest.experimental.TestOptionBuilder._
+import chiseltest.internal.WriteVcdAnnotation
 
-class AxonSystemTest(dut: AxonSystem) extends PeekPokeTester(dut) {
+class AxonSystemTester extends FlatSpec with ChiselScalatestTester with Matchers {
+  behavior of "Axon System"
 
-  // set all inputs low
+  it should "pass" in {
+    test(new AxonSystem()).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        // Set inputs low
+        dut.io.axonIn.poke(0.U)
+        dut.io.axonValid.poke(false.B)
+        dut.io.inOut.poke(false.B)
+        dut.io.rAddr.poke(0.U)
+        dut.io.rEna.poke(false.B)
+        dut.clock.step()
 
-  poke(dut.io.axonIn, 0)
-  poke(dut.io.axonValid, false)
-  poke(dut.io.inOut, false)
-  poke(dut.io.rAddr, 0)
-  poke(dut.io.rEna, false)
-  step(5)
+        // Write the first memory
+        for (i <- 0 until 5 * 1024) {
+          dut.io.axonIn.poke((i/5).U)
+          dut.io.axonValid.poke((i % 5 == 0).B)
+          dut.clock.step()
+        }
 
-  //write to one mem
-  for (i <- 0 to 1024 * 5 - 1) {
-    if (i % 5 == 0) {
-      poke(dut.io.axonIn, (i / 5))
-      poke(dut.io.axonValid, true)
+        // Read the other memory and check that it is empty
+        dut.io.rEna.poke(true.B)
+        for (i <- 0 until 1024) {
+          dut.io.rAddr.poke(i.U)
+          dut.clock.step()
+          dut.io.rData.expect(0.U)
+        }
+        dut.io.rEna.poke(false.B)
 
-    } else {
-      poke(dut.io.axonValid, false)
+        // New time step (swap memories)
+        dut.io.inOut.poke(true.B)
+        dut.clock.step()
+
+        // Read the first memory and check its content
+        dut.io.rEna.poke(true.B)
+        for (i <- 0 until 1024) {
+          dut.io.rAddr.poke(i.U)
+          dut.clock.step()
+          dut.io.rData.expect(i.U)
+        }
+        dut.io.rEna.poke(false.B)
+
+        // Write the second memory
+        for (i <- 0 until 5 * 1024) {
+          dut.io.axonIn.poke((i/5).U)
+          dut.io.axonValid.poke((i % 5 == 0).B)
+          dut.clock.step()
+        }
+
+        // New time step (swap memories)
+        dut.io.inOut.poke(false.B)
+        dut.clock.step()
+
+        // Read the second memory
+        dut.io.rEna.poke(true.B)
+        for (i <- 0 until 1024) {
+          dut.io.rAddr.poke(i.U)
+          dut.clock.step()
+          dut.io.rData.expect(i.U)
+        }
+        dut.io.rEna.poke(false.B)
     }
-    step(1)
-  }
-
-
-  //read the other mem should be empty
-  poke(dut.io.rEna, true)
-  for (i <- 0 to 1024 - 1) {
-    //println("read step: " + i.toString)
-    poke(dut.io.rAddr, i)
-    step(1)
-    //println("data: " + peek(dut.io.rData).toString)
-    expect(dut.io.rData, 0)
-  }
-  poke(dut.io.rEna, false)
-
-  step(5)
-  //new time step
-  poke(dut.io.inOut, true)
-
-  step(5)
-
-  //test newly written memory
-  poke(dut.io.rEna, true)
-  for (i <- 0 to 1024 - 1) {
-    //println("2nd read step: " + i.toString)
-    poke(dut.io.rAddr, i)
-    step(1)
-    //println("data expect: " + (i*5).toString + "Get: " + peek(dut.io.rData).toString)
-    expect(dut.io.rData, i)
-  }
-  poke(dut.io.rEna, false)
-
-  step(5)
-
-  //write to the other memory
-  for (i <- 0 to 1024 * 5 - 1) {
-    if (i % 5 == 0) {
-      poke(dut.io.axonIn, (i / 5))
-      poke(dut.io.axonValid, true)
-
-    } else {
-      poke(dut.io.axonValid, false)
-    }
-    step(1)
-  }
-
-  step(5)
-
-  //new timestep
-  poke(dut.io.inOut, false)
-
-  step(5)
-
-  //test other written memory
-  poke(dut.io.rEna, true)
-  for (i <- 0 to 1024 - 1) {
-    //println("2nd read step: " + i.toString)
-    poke(dut.io.rAddr, i)
-    step(1)
-    //println("data expect: " + (i*5).toString + "Get: " + peek(dut.io.rData).toString)
-    expect(dut.io.rData, i)
-  }
-  poke(dut.io.rEna, false)
-
-
-}
-
-class AxonSystemSpec extends FlatSpec with Matchers {
-  "AxonSystem " should "pass" in {
-    chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new AxonSystem()) { c => new AxonSystemTest(c) } should be(true)
   }
 }

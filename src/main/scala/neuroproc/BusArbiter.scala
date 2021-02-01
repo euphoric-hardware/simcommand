@@ -1,6 +1,7 @@
+package neuroproc
+
 import chisel3._
-import Constants._
-import util._
+import chisel3.util._
 
 class BusArbiter extends Module {
   val io = IO(new Bundle {
@@ -17,41 +18,33 @@ class BusArbiter extends Module {
   val oneReq     = Wire(Bool())
   val value      = Wire(UInt(log2Up(CORES).W))
 
-  value  := 0.U //default assignments
+  // Default assignment
+  value  := 0.U 
   oneReq := false.B
 
-  for (i <- 0 to CORES - 1) {
+  for (i <- 0 until CORES) {
+    // Store incoming requests and the mask
     maskRegs(i)  := mask(i)
     grantRegs(i) := grants(i)
+
+    // Mask requests
+    maskedReqs(i) := maskRegs(i) && io.reqs(i)
+
+    // Check if a request is high
+    when(maskedReqs(i)) {
+      oneReq := true.B
+      value  := i.U
+    }
+
+    // Generate grants
+    grants(i) := (i.U === value && oneReq)
   }
 
-  when(value === 0.U) {
-    mask(CORES - 1) := true.B
-  }.otherwise {
-    mask(CORES - 1) := false.B
-  }
+  // Generate mask from masked requests
   for (i <- 0 to CORES - 2) {
     mask(i) := mask(i + 1) || maskedReqs(i + 1)
   }
+  mask(CORES-1) := value === 0.U
 
-  for (i <- 0 to CORES - 1) {
-    maskedReqs(i) := maskRegs(i) && io.reqs(i)
-  }
-
-  for (j <- 0 to CORES - 1) {
-    when(maskedReqs(j)) {
-      oneReq := true.B
-      value  := j.U
-    }
-  }
-
-  for (j <- 0 to CORES - 1) {
-    when(j.U === value && oneReq) {
-      grants(j) := true.B
-    }.otherwise {
-      grants(j) := false.B
-    }
-  }
   io.grants := grantRegs
-
 }

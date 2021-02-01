@@ -1,7 +1,7 @@
+package neuroproc
+
 import chisel3._
 import chisel3.util._
-import Constants._
-
 
 class NeuronCore(coreID: Int) extends Module {
   val io = IO(new Bundle {
@@ -36,8 +36,6 @@ class NeuronCore(coreID: Int) extends Module {
   for (i <- 0 until EVALUNITS) {
     spikeTrans.io.spikes(i) := neurons.io.spikes(i)
   }
-
-
 }
 
 object NeuronCore extends App {

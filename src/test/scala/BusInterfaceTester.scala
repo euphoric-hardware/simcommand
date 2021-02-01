@@ -1,82 +1,101 @@
-import chisel3.iotesters.PeekPokeTester
+import neuroproc._
+
 import org.scalatest._
-import Constants._
+import chisel3._
+import chiseltest._
+import chiseltest.experimental.TestOptionBuilder._
+import chiseltest.internal.WriteVcdAnnotation
 
-class BusInterfaceTest(dut: BusInterface) extends PeekPokeTester(dut) {
-  //All low
-  poke(dut.io.grant, false)
-  poke(dut.io.rx, 0)
-  poke(dut.io.reqIn, false)
-  poke(dut.io.spikeID, 0)
+class BusInterfaceTester extends FlatSpec with ChiselScalatestTester with Matchers {
+  behavior of "Bus Interface"
 
-  step(1)
+  it should "work with all-low inputs" in {
+    test(new BusInterface(0)).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        dut.io.grant.poke(false.B)
+        dut.io.rx.poke(0.U)
+        dut.io.reqIn.poke(false.B)
+        dut.io.spikeID.poke(0.U)
+        
+        dut.clock.step()
 
-  expect(dut.io.reqOut, false)
-  expect(dut.io.tx, 0)
-  expect(dut.io.ready, false)
-  expect(dut.io.valid, false)
-  expect(dut.io.axonID, 0)
+        dut.io.reqOut.expect(false.B)
+        dut.io.tx.expect(0.U)
+        dut.io.ready.expect(false.B)
+        dut.io.valid.expect(false.B)
+        dut.io.axonID.expect(0.U)
+    }
+  }
 
-  //Test tx input without grant
-  poke(dut.io.grant, false)
-  poke(dut.io.rx, 0)
-  poke(dut.io.reqIn, true)
-  poke(dut.io.spikeID, Integer.parseInt("101010101010", 2))
+  it should "perform tx without grant" in {
+    test(new BusInterface(0)).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        dut.io.grant.poke(false.B)
+        dut.io.rx.poke(0.U)
+        dut.io.reqIn.poke(true.B)
+        dut.io.spikeID.poke("b01010101010".U)
 
-  step(1)
+        dut.clock.step()
 
-  expect(dut.io.reqOut, true)
-  expect(dut.io.tx, 0)
-  expect(dut.io.ready, false)
-  expect(dut.io.valid, false)
-  expect(dut.io.axonID, 0)
+        dut.io.reqOut.expect(true.B)
+        dut.io.tx.expect(0.U)
+        dut.io.ready.expect(false.B)
+        dut.io.valid.expect(false.B)
+        dut.io.axonID.expect(0.U)
+    }
+  }
 
-  //Test tx input with grant
-  poke(dut.io.grant, true)
-  poke(dut.io.rx, 0)
-  poke(dut.io.reqIn, true)
-  poke(dut.io.spikeID, Integer.parseInt("101010101010", 2))
+  it should "perform tx with grant" in {
+    test(new BusInterface(0)).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        dut.io.grant.poke(true.B)
+        dut.io.rx.poke(0.U)
+        dut.io.reqIn.poke(true.B)
+        dut.io.spikeID.poke("b01010101010".U)
 
-  step(1)
+        dut.clock.step()
 
-  expect(dut.io.reqOut, false)
-  expect(dut.io.tx, Integer.parseInt("101010101010", 2))
-  expect(dut.io.ready, true)
-  expect(dut.io.valid, false)
-  expect(dut.io.axonID, 0)
+        dut.io.reqOut.expect(false.B)
+        dut.io.tx.expect("b01010101010".U)
+        dut.io.ready.expect(true.B)
+        dut.io.valid.expect(false.B)
+        dut.io.axonID.expect(0.U)
+    }
+  }
 
-  //Test rx with subscription
-  poke(dut.io.grant, false)
-  poke(dut.io.rx, Integer.parseInt("000010101010", 2))
-  poke(dut.io.reqIn, false)
-  poke(dut.io.spikeID, 0)
+  it should "perform rx without subscription" in {
+    test(new BusInterface(4)).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        dut.io.grant.poke(false.B)
+        dut.io.rx.poke("b00110101010".U)
+        dut.io.reqIn.poke(false.B)
+        dut.io.spikeID.poke(0.U)
 
-  step(1)
+        dut.clock.step()
 
-  expect(dut.io.reqOut, false)
-  expect(dut.io.tx, 0)
-  expect(dut.io.ready, false)
-  expect(dut.io.valid, true)
-  expect(dut.io.axonID, Integer.parseInt("0010101010", 2))
+        dut.io.reqOut.expect(false.B)
+        dut.io.tx.expect(0.U)
+        dut.io.ready.expect(false.B)
+        dut.io.valid.expect(false.B)
+        dut.io.axonID.expect("b10101010".U)
+    }
+  }
 
-  //Test rx without subscription
-  poke(dut.io.grant, false)
-  poke(dut.io.rx, Integer.parseInt("000110101010", 2))
-  poke(dut.io.reqIn, false)
-  poke(dut.io.spikeID, 0)
+  it should "perform rx with subscription" in {
+    test(new BusInterface(4)).withAnnotations(Seq(WriteVcdAnnotation)) {
+      dut =>
+        dut.io.grant.poke(false.B)
+        dut.io.rx.poke("b01010101010".U)
+        dut.io.reqIn.poke(false.B)
+        dut.io.spikeID.poke(0.U)
 
-  step(1)
+        dut.clock.step()
 
-  expect(dut.io.reqOut, false)
-  expect(dut.io.tx, 0)
-  expect(dut.io.ready, false)
-  expect(dut.io.valid, false)
-  expect(dut.io.axonID, Integer.parseInt("0010101010", 2))
-
-}
-
-class BusInterfaceSpec extends FlatSpec with Matchers {
-  "BusInterface " should "pass" in {
-    chisel3.iotesters.Driver.execute(Array("--generate-vcd-output", "on"), () => new BusInterface(0)) { c => new BusInterfaceTest(c) } should be(true)
+        dut.io.reqOut.expect(false.B)
+        dut.io.tx.expect(0.U)
+        dut.io.ready.expect(false.B)
+        dut.io.valid.expect(true.B)
+        dut.io.axonID.expect("b10101010".U)
+    }
   }
 }

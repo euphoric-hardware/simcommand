@@ -1,16 +1,16 @@
+package neuroproc
+
 import chisel3._
 import chisel3.util._
-import Constants._
 import spray.json._
 
 // This file is very hard coded for this project
-
-class OffChipCom(frequency: Int, baudRate: Int) extends Module{
+class OffChipCom(frequency: Int, baudRate: Int) extends Module {
   val io = IO(new Bundle{
     val tx = Output(Bool())
     val rx = Input(Bool())
 
-    //valid ready for in and out cores
+    // Valid/ready for in and out cores
     val inC0Data  = Output(UInt(24.W))
     val inC0Valid = Output(Bool())
     val inC0Ready = Input(Bool())
@@ -23,7 +23,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
     val outCValid = Input(Bool())
     val outCReady = Output(Bool())
 
-    //synchronize channels for input cores
+    // Synchronize channels for input cores
     val inC0HSin  = Input(Bool())
     val inC0HSout = Output(Bool())
 
@@ -54,43 +54,55 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
   val idle :: start :: receiveW :: toCore :: Nil = Enum(4)
   val stateReg = RegInit(idle)
 
+  // Concatenate buffers for a combined data word
   inCData := addr0 ## rate1 ## rate0
 
-  //rx default
+  // RX logic
   uart.io.rxd := io.rx
   uart.io.rxReady := false.B
 
-  //tx logic
-  io.tx := uart.io.txd
-  uart.io.txValid := txV
-  uart.io.txByte := txBuf
-
-  when(uart.io.txReady && txV) {
-    txV := false.B
-  }
-
-  //in core validReady logic
+  // Input core valid/ready logic
   io.inC0HSout := phase
-  io.inC0Data := inCData
+  io.inC0Data  := inCData
   io.inC0Valid := inC0V
   when(inC0V && io.inC0Ready) {
     inC0V := false.B
   }
 
   io.inC1HSout := phase
-  io.inC1Data := inCData
+  io.inC1Data  := inCData
   io.inC1Valid := inC1V
   when(inC1V && io.inC1Ready) {
     inC1V := false.B
   }
 
-  switch(stateReg) { //This FSM controls revieving of rates
-    is(idle) {//TODO how to start receiving
-      when(phase === io.inC0HSin && io.inC0HSin === io.inC1HSin) { // in phase means we can sent
+  // TX logic
+  io.tx := uart.io.txd
+  uart.io.txValid := txV
+  uart.io.txByte := txBuf
+  when(uart.io.txReady && txV) {
+    txV := false.B
+  }
+
+  // Output cores valid/ready logic
+  io.outCReady := false.B
+  when(io.outCValid && ~txV) { //not busy in receive loop
+    txV := true.B
+    io.outCReady := true.B
+    txBuf := io.outCData
+  }
+
+  // Control FSM
+  switch(stateReg) {
+    is(idle) {
+      // When the input cores are in phase, transfers can begin
+      when(phase === io.inC0HSin && io.inC0HSin === io.inC1HSin) {
         stateReg := start
       }
     }
     is(start) {
+      // When the UART has completed a transfer, receive an image;
+      // otherwise reset the counters and transfer
       when(uart.io.txReady) {
         stateReg := receiveW
       }.otherwise {
@@ -101,7 +113,8 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
       }
     }
     is(receiveW) {
-      when(uart.io.rxValid) { //shift in new byte
+      // When a new byte has been received, shift it into the registers
+      when(uart.io.rxValid) {
         addr1 := addr0
         addr0 := rate1
         rate1 := rate0
@@ -118,13 +131,16 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
       }
     }
     is(toCore) {
-      when (addr1 === 0.U){
+      // Transfer the received word to one of the input cores
+      when(addr1 === 0.U) {
         inC0V := true.B
       }.otherwise {
         inC1V := true.B
       }
       pixCnt := pixCnt + 1.U
       
+      // If a full image has been received, go back to idle;
+      // otherwise, receive more words
       when(pixCnt === (INPUTSIZE-1).U) {
         stateReg := idle
         phase := ~phase
@@ -133,18 +149,8 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module{
       }
     }
   }
-
-  //out core validReady logic
-  io.outCReady := false.B
-  when (io.outCValid && ~txV){ //not busy in receive loop
-    txV := true.B
-    io.outCReady := true.B
-    txBuf := io.outCData
-  }
-
-
 }
 
 object OffChip extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new OffChipCom(50000000, 115200))
+  chisel3.Driver.execute(Array("--target-dir", "build"), () => new OffChipCom(FREQ, BAUDRATE))
 }

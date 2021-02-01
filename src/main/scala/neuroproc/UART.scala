@@ -1,3 +1,5 @@
+package neuroproc
+
 import chisel3._
 import chisel3.util._
 
@@ -23,20 +25,19 @@ class Tx(frequency: Int, baudRate: Int) extends Module {
   io.tx := txBit
   io.ready := readyR
 
-  when(clkCnt === sampleDiv){
+  when(clkCnt === sampleDiv) {
     clkCnt := 0.U
     baudtick := true.B
-  }.otherwise{
+  }.otherwise {
     clkCnt := clkCnt + 1.U
     baudtick := false.B
   }
 
-
   readyR := false.B
 
-  switch(state){
-    is(sstart){
-      when(baudtick && io.valid){
+  switch(state) {
+    is(sstart) {
+      when(baudtick && io.valid) {
         txBit := false.B
         state := sdata
         bitCnt := 0.U
@@ -44,20 +45,20 @@ class Tx(frequency: Int, baudRate: Int) extends Module {
         data := io.data
       }
     }
-    is(sdata){
-      when(baudtick){
+    is(sdata) {
+      when(baudtick) {
         txBit := data(0)
         data := true.B ## data(7,1)
-        when(bitCnt < 7.U){
+        when(bitCnt < 7.U) {
           bitCnt := bitCnt + 1.U
-        }.otherwise{
+        }.otherwise {
           bitCnt := 0.U
           state := sstop
         }
       }
     }
-    is(sstop){
-      when(baudtick){
+    is(sstop) {
+      when(baudtick) {
         txBit := true.B
         state := sstart
       }
@@ -72,8 +73,10 @@ class Rx(frequency: Int, baudRate: Int) extends Module {
     val valid = Output(Bool())
     val data = Output(UInt(8.W))
   })
+
   val overSampleDiv = (frequency/(baudRate*16)).U
   val gstart :: gdata :: gstop :: Nil = Enum(3)
+
   val dataSr   = RegInit("b11".U(2.W)) //make this in another way
   val filter   = RegInit("b11".U(2.W))
   val rxBit    = RegInit(true.B)
@@ -86,83 +89,79 @@ class Rx(frequency: Int, baudRate: Int) extends Module {
   val bitCnt   = RegInit(0.U(3.W))
   val validR   = RegInit(false.B)
 
-
   io.data := data
   io.valid := validR
 
-  when(validR && io.ready){
+  when(validR && io.ready) {
     validR := false.B
   }
 
-  when(clkCnt === overSampleDiv){ //oversampled baudTick
+  when(clkCnt === overSampleDiv) { //oversampled baudTick
     baudTick := true.B
     clkCnt := 0.U
-  }.otherwise{
+  }.otherwise {
     baudTick := false.B
     clkCnt := clkCnt + 1.U
   }
 
   bitTick := false.B
 
-  when(baudTick){
+  when(baudTick) {
     dataSr := dataSr(0) ## io.rx //sync oversample
 
-
-    when(dataSr(1) && filter < 3.U){//filtering oversample
+    when(dataSr(1) && filter < 3.U) {//filtering oversample
       filter := filter + 1.U
-    }.elsewhen(!dataSr(1) && filter > 0.U){
+    }.elsewhen(!dataSr(1) && filter > 0.U) {
       filter := filter - 1.U
     }
 
-    when(filter === 3.U){
+    when(filter === 3.U) {
       rxBit := true.B
-    }.elsewhen(filter === 0.U){
+    }.elsewhen(filter === 0.U) {
       rxBit := false.B
     }
 
-
-    when(spaceCnt === 15.U){//spacing to match baud
+    when(spaceCnt === 15.U) {//spacing to match baud
       bitTick := true.B
       spaceCnt := 0.U
-    }.otherwise{
+    }.otherwise {
       spaceCnt := spaceCnt + 1.U
     }
-    when(state === gstart){
+    when(state === gstart) {
       spaceCnt := 0.U
     }
   }
 
-  switch(state){
-    is(gstart){
-      when(baudTick && !rxBit){
+  switch(state) {
+    is(gstart) {
+      when(baudTick && !rxBit) {
         state := gdata
       }
     }
-    is(gdata){
-      when(bitTick){
+    is(gdata) {
+      when(bitTick) {
         data := rxBit ## data(7,1)
         when(bitCnt < 7.U){
           bitCnt := bitCnt + 1.U
-        }.otherwise{
+        }.otherwise {
           bitCnt := 0.U
           state := gstop
         }
       }
     }
-    is(gstop){
-      when(bitTick && rxBit){
+    is(gstop) {
+      when(bitTick && rxBit) {
         state := gstart
         validR := true.B
       }
     }
   }
-
 }
 
 class Uart(frequency: Int, baudRate: Int) extends Module {
   val io = IO(new Bundle {
-    val rxd = Input(UInt(1.W))
-    val txd = Output(UInt(1.W))
+    val rxd = Input(Bool())
+    val txd = Output(Bool())
 
     val rxReady = Input(Bool())
     val rxValid = Output(Bool())
@@ -173,7 +172,6 @@ class Uart(frequency: Int, baudRate: Int) extends Module {
     val txByte  = Input(UInt(8.W))
   })
 
-  
   val tx = Module(new Tx(frequency, baudRate))
   val rx = Module(new Rx(frequency, baudRate))
 
@@ -201,32 +199,29 @@ class UartEcho(frequency: Int, baudRate: Int) extends Module {
   val atx = Module(new Tx(frequency, baudRate))
   val arx = Module(new Rx(frequency, baudRate))
 
-
   io.txd := atx.io.tx
   arx.io.rx := io.rxd
-
 
   ready := false.B
   atx.io.valid := valid
   atx.io.data := data
   arx.io.ready := ready
 
-  when(arx.io.valid){
+  when(arx.io.valid) {
     data := arx.io.data
     valid := true.B
     ready := true.B
   }
 
-  when(valid && atx.io.ready){
+  when(valid && atx.io.ready) {
     valid := false.B
   }
 }
 
-
 object Uart extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new Uart(80000000, 115200))
+  chisel3.Driver.execute(Array("--target-dir", "build"), () => new Uart(FREQ, BAUDRATE))
 }
 
 object UartEcho extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new UartEcho(80000000, 115200))
+  chisel3.Driver.execute(Array("--target-dir", "build"), () => new UartEcho(FREQ, BAUDRATE))
 }

@@ -1,5 +1,5 @@
 
 kintexDemo:
-	-sbt "runMain MakeDataFiles"
-	-sbt "runMain NeuromorphicProcessor"
+	-sbt "runMain neuroproc.MakeDataFiles"
+	-sbt "runMain neuroproc.NeuromorphicProcessor"
 	-python3 mapping/InsertLines.py

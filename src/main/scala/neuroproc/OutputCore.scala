@@ -1,31 +1,32 @@
+package neuroproc
+
 import chisel3._
 import chisel3.util._
-import Constants._
 
 // The output core is for now hardcoded to deal with the specific showcase network
-class OutputCore(coreID : Int) extends Module{
+class OutputCore(coreID : Int) extends Module {
   val io = IO(new Bundle{
-    // to off chip communication
+    // To off chip communication
     val offCCData  = Output(UInt(8.W))
     val offCCValid = Output(Bool())
     val offCCReady = Input(Bool())
 
-    //to bus 
+    // To bus 
     val grant = Input(Bool())
     val req   = Output(Bool())
     val tx    = Output(UInt(GLOBALADDRWIDTH.W))
     val rx    = Input(UInt(GLOBALADDRWIDTH.W))
   })
 
-  //valid ready for OCC
+  // Valid/ready for off chip communication
   val offCCData  = RegInit(0.U(8.W))
   val offCCValid = RegInit(false.B)
 
-  //interface to/from bus
+  // Bus interface
   val interface  = Module(new BusInterface(coreID))
 
-  // Queue memory
-  val queMem  = SyncReadMem(16, UInt(8.W))
+  // Queue memory - a circular FIFO
+  val queMem    = SyncReadMem(16, UInt(8.W))
   val addr      = Wire(UInt(4.W))
   val wr        = Wire(Bool()) //false: read, true: write
   val ena       = Wire(Bool())
@@ -34,12 +35,11 @@ class OutputCore(coreID : Int) extends Module{
 
   val readComing = RegInit(false.B)
 
-
   val rAddr = RegInit(0.U(4.W))
   val wAddr = RegInit(0.U(4.W))
   val items = RegInit(0.U(4.W))
 
-  // default assignments
+  // Default assignments
   ena := false.B
   wr := false.B
   addr := rAddr
@@ -48,32 +48,33 @@ class OutputCore(coreID : Int) extends Module{
 
   readComing := false.B
 
-  //interface default
+  // Interface default
   interface.io.grant      := io.grant
   io.req                  := interface.io.reqOut
   io.tx                   := interface.io.tx
   interface.io.rx         := io.rx
-  interface.io.reqIn      := false.B //Never sends anything
-  interface.io.spikeID    := 0.U //Never sends anything
+  interface.io.reqIn      := false.B // Never sends anything
+  interface.io.spikeID    := 0.U // Never sends anything
 
   io.offCCValid := offCCValid
   io.offCCData  := offCCData
 
+  // Control synchronous FIFO
   when(ena) {
-    val rdwrPort = queMem(addr)
     when(wr) {
-      rdwrPort := writeData
+      queMem(addr) := writeData
     }.otherwise {
-      readData := rdwrPort
+      readData := queMem(addr)
     }
   }
 
-
+  // Update valid signal on handshake
   when(offCCValid && io.offCCReady){
     offCCValid := false.B
   }
 
-  when (interface.io.valid){
+  when (interface.io.valid) {
+    // When a spike is being signaled, add it to the FIFO if there is room
     when(items < 16.U){
       ena := true.B
       wr := true.B
@@ -81,18 +82,19 @@ class OutputCore(coreID : Int) extends Module{
       wAddr := wAddr + 1.U
       items := items + 1.U
     }
-  }.elsewhen(!offCCValid && !readComing && items > 0.U){
+  }.elsewhen(!offCCValid && !readComing && items > 0.U) {
+    // When the off chip communication is ready, and there is a spike available;
+    // transfer it out of the output core
     ena := true.B
     wr := false.B
     addr := rAddr
     rAddr := rAddr + 1.U
     items := items - 1.U
     readComing := true.B
-    //offCCValid := true.B
-    //offCCData := readData
   }
 
-  when(readComing){
+  // Output correct data from the FIFO
+  when(readComing) {
     offCCValid := true.B
     offCCData := readData
   }
