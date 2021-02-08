@@ -3,12 +3,9 @@
 .vscode*
 project/*
 target/*
-.idea/
-
 *.hex
 *.mif
 test_run_dir/
 build/
-editedbackup/
-
-VivadoProject/KintexDemo/
+netwkdev/data*
+netwkdev/kwsonsnn/__pycache__*
