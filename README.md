@@ -1,6 +1,5 @@
 # NeuromorphicProcessor
-Neuromorphic processor implementation for Master thesis
-
+Neuromorphic processor implementation for Master thesis - WIP!
 
 ## Install guide (Tested only with Ubuntu 18.04 and 19.04):
 ### Java 8
@@ -26,29 +25,3 @@ Choose java 8 for both
 ### Verilator
 
     $sudo apt-get install verilator
-
-
-## Run Demo
-
-The demo requires [Digilents Genesys 2 board](https://reference.digilentinc.com/reference/programmable-logic/genesys-2/reference-manual) and the Design Edition of Vivado installed (there is a 30 day trail).
-
-
-
-Once above is installed the demo is set up by following steps
-
-- Clone this repository to a your machine
-
-- Run the make command:
-
-    $make kintexDemo
-
-    - This generates Verilog and set up a tcl script for Vivado
-
-- Open Vivado 
-    - click: tools -> download latest boards (to get board files for Genesys 2)
-    - click: tools -> run tcl script
-    - Choose the file "vivadoBuild.tcl" in this repository (This creates the demo Vivado Project in the repository folder and generates a bitstream file)
-    - Program the FPGA through the hardware manager and download the generated bit stream
-    - reset the circuit by pressing the button BTNU
-    - Run the [Python3 script](https://github.com/Thonner/bindsnet/blob/master/examples/mnist/BNSupervised_mnistTransfer.py) from [this forked version of BindsNET](https://github.com/Thonner/bindsnet) to feed the system inputs. The forked BindsNET must be cloned and its dependencies installed with pip beforehand
-    
