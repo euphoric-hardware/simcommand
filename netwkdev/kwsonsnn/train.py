@@ -1,10 +1,10 @@
 # Again, reused from
 # https://github.com/Thonner/bindsnet/blob/master/examples/mnist/supervised_mnist.py
 
-from .model import ShowCaseNet
-from .dataset import SpeechCommandsDataset
-from .encode import RateEncoder
-from .utils import get_default_net, download
+from model import ShowCaseNet
+from dataset import SpeechCommandsDataset
+from encode import RateEncoder
+from utils import get_default_net, download
 
 import argparse
 import numpy as np
