@@ -79,6 +79,42 @@ def ratePeriod(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> tor
     return torch.clamp(rate.round(), min=0, max=time).long()
 
 # Everything below here is new
+class RankOrderDirect(Encoder):
+    def __init__(self, time: int, dt: float = 1.0, **kwargs):
+        """
+        Creates a callable RankOrderDirect which returns the period of rank-order
+        encoded spikes as defined in ``bindsnet.encoding``
+
+        :param time: Length of input spike train per input variable.
+        :param dt: Simulation time step.
+        """
+        super().__init__(time, dt=dt, **kwargs)
+
+        self.enc = rankOrderDirect
+
+def rankOrderDirect(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> torch.Tensor:
+    """
+    Direct rank order coding (alternative to BindsNET's implementation).    
+    """
+    assert (datum >= 0).all(), "Inputs must be non-negative"
+
+    # Get shape and size of data.
+    shape, size = datum.shape, datum.numel()
+    datum = datum.flatten()
+    time = int(time / dt)
+
+    # Compute encoding. One spike in each time step based on sorted data.
+    spikeTimes = torch.argsort(datum)
+    spikes = torch.zeros(time*size)
+    for i in range(min(time, size)):
+        spikes[i*size + spikeTimes[i]] = 1
+
+    # Calculate return shape.
+    rShape = [time]
+    rShape.extend(shape)
+    
+    return torch.reshape(spikes, tuple(rShape))
+
 class RankOrderPeriod(Encoder):
     def __init__(self, time: int, dt: float = 1.0, **kwargs):
         """

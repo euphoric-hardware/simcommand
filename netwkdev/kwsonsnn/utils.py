@@ -1,4 +1,4 @@
-from model import ShowCaseNet
+from .model import ShowCaseNet
 
 import os
 import shutil

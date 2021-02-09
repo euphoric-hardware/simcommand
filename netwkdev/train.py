@@ -1,10 +1,10 @@
 # Again, reused from
 # https://github.com/Thonner/bindsnet/blob/master/examples/mnist/supervised_mnist.py
 
-from model import ShowCaseNet
-from dataset import SpeechCommandsDataset
-from encode import RateEncoder
-from utils import get_default_net, download
+from kwsonsnn.model import ShowCaseNet
+from kwsonsnn.dataset import SpeechCommandsDataset
+from kwsonsnn.encode import RateEncoder
+from kwsonsnn.utils import get_default_net, download
 
 import argparse
 import numpy as np
@@ -81,8 +81,8 @@ network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 
 # Get the dataset
 print('Fetching the dataset')
-download('../data')
-dataset = SpeechCommandsDataset('../data')
+download('./data')
+dataset = SpeechCommandsDataset('./data')
 dataset.process_data()
 # TODO: Replace this with more efficient alternative!
 audio_enc = RateEncoder(time=time, dt=dt)

@@ -1,8 +1,8 @@
 # Once again, reused from
 # https://github.com/Thonner/bindsnet/blob/master/examples/mnist/BNSupervised_mnist_map_gen.py
 
-from model import ShowCaseNet
-from utils import get_default_net
+from .model import ShowCaseNet
+from .utils import get_default_net
 
 import torch
 import json
