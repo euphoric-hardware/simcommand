@@ -27,6 +27,7 @@ package object neuroproc {
   val RATEWIDTH        = log2Up(500)
   val RATEADDRWIDTH    = log2Up(NEURONSPRCORE)
   val INPUTSIZE        = 22*22
+  val RANKORDERENC     = false
 
   // Memory offsets
   val OSREFRAC    = 0

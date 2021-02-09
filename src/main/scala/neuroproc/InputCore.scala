@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 class InputCore(coreID : Int) extends Module {
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     // To off chip communication
     val offCCData  = Input(UInt(24.W))
     val offCCValid = Input(Bool())
@@ -50,11 +50,12 @@ class InputCore(coreID : Int) extends Module {
   val tsCycleCnt   = RegInit(CYCLESPRSTEP.U)                         // Count time step cycles down to 0
   val phase        = RegInit(false.B)                                // Init to in phase (download first)
   val cntrEna      = WireDefault(false.B)
-  val cntrRateData = Wire(UInt(RATEWIDTH.W))
+  val cntrPeriod   = Wire(UInt(RATEWIDTH.W))
   val spikePulse   = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))  // Used to deliver spike pulses to transmission
   val idle :: firstr :: spikegen :: lastgen :: sWait :: Nil = Enum(5)
   val stateReg     = RegInit(idle)
   val sPulseDecSig = WireDefault(EVALUNITS.U((log2Up(EVALUNITS)+1).W))
+  val shouldSpike  = Wire(Bool())
 
   io.offCCHSout := phase
 
@@ -103,12 +104,12 @@ class InputCore(coreID : Int) extends Module {
 
     ena1 := cntrEna
     wr1 := false.B
-    cntrRateData := rdata1 
+    cntrPeriod := rdata1 
     addr1 := pixcnt
   }.otherwise {
     ena0 := cntrEna
     wr0 := false.B
-    cntrRateData := rdata0 
+    cntrPeriod := rdata0 
     addr0 := pixcnt
 
     ena1 := io.offCCValid
@@ -122,14 +123,18 @@ class InputCore(coreID : Int) extends Module {
     tsCycleCnt := CYCLESPRSTEP.U
   }
 
-  // Spike rate is encoded as a period - if the time step mod the rate period
-  // is zero; generate a spike
-  val modRes = Wire(UInt(RATEWIDTH.W))
-  when(ts === 0.U || cntrRateData === 0.U) {
-    modRes := 1.U
-  }.otherwise {
-    modRes := ts % cntrRateData //TODO what about modulus with 0
+  // Methods for spike generation
+  def ratePeriodSpiker() = {
+    val res = Mux(ts === 0.U || cntrPeriod === 0.U, 1.U, ts % cntrPeriod)
+    res === 0.U
   }
+  def rankOrderPeriodSpiker() = ts === cntrPeriod
+
+  // Spike rates are encoded with periods
+  if (RANKORDERENC)
+    shouldSpike := rankOrderPeriodSpiker()
+  else
+    shouldSpike := ratePeriodSpiker()
 
   // Control FSM
   switch(stateReg) {
@@ -155,7 +160,7 @@ class InputCore(coreID : Int) extends Module {
     is(spikegen) {
       cntrEna := true.B
       pixcnt := pixcnt + 1.U
-      when(modRes === 0.U) { // TODO: Figure out why this line does not include ``cntrRateData =/= 0.U``.
+      when(shouldSpike) {
         sPulseDecSig := 0.U(1.W) ## pixcntLate(log2Up(EVALUNITS)-1,0)
       }
 
@@ -167,7 +172,7 @@ class InputCore(coreID : Int) extends Module {
     // State 3 - spikes the last time and increments the time step count
     is(lastgen) {
       ts := ts + 1.U
-      when(cntrRateData =/= 0.U && modRes === 0.U) {
+      when(shouldSpike) {
         sPulseDecSig := 0.U(1.W) ## pixcntLate(log2Up(EVALUNITS)-1,0)
       }
 

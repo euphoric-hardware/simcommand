@@ -1,5 +1,6 @@
 .metals*
 .bloop*
+.bsp*
 .vscode*
 project/*
 target/*

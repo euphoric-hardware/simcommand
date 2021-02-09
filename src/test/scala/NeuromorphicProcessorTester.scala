@@ -12,7 +12,7 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester wi
   val bitDelay = FREQ / BAUDRATE + 1
 
   it should "process an image" in {
-    test(new NeuromorphicProcessor()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) {
+    test(new NeuromorphicProcessor()).withAnnotations(Seq(VerilatorBackendAnnotation)) {
       dut =>
         dut.clock.setTimeout(FREQ)
 
