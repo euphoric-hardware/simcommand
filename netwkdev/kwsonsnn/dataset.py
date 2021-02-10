@@ -113,12 +113,18 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
                     lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
                     lines = [os.path.join(self.path, x) for x in lines]
                     remove_files.extend(lines)
+        # Fix difference between Win32 and Unix paths
+        remove_files = list(map(lambda x: x.replace('\\', '/'), remove_files))
 
         # First find which files to use
         files = []
         for d in [os.path.join(self.path, kw) for kw in self.kws]:
             for root, _, filenames in os.walk(d):
                 files.extend(list(map(lambda x: os.path.join(root, x), filenames)))
+        # Fix difference between Win32 and Unix paths
+        files = list(map(lambda x: x.replace('\\', '/'), files))
+
+        # Remove files used as part of the other splits
         files = list(set(files).difference(set(remove_files)))
 
         # Fetch the processed data
