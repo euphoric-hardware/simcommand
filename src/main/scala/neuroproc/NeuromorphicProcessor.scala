@@ -17,7 +17,6 @@ class NeuromorphicProcessor extends Module {
   val neuCores = (2 until 4).map(i => Module(new NeuronCore(i)))
   val outCore = Module(new OutputCore(4))
   
-
   // Connecting off chip communication to in/output cores and UART port
   io.uartTx := offCC.io.tx
   offCC.io.rx := io.uartRx
@@ -38,41 +37,45 @@ class NeuromorphicProcessor extends Module {
   offCC.io.outCValid       := outCore.io.offCCValid
   outCore.io.offCCReady    := offCC.io.outCReady
 
-
   // Communication fabric - a simple bus
   val busArbiter = Module(new BusArbiter)
-  val dataBusOr = Wire(Vec(CORES - 1, UInt(GLOBALADDRWIDTH.W)))
+  //val dataBusOr = Wire(Vec(CORES - 1, UInt(GLOBALADDRWIDTH.W)))
   val busTx = Wire(UInt(GLOBALADDRWIDTH.W))
 
   // Connecting cores to the communication fabric
   // Could be replaced by generic:
-  // val cores = inCores ++ neuCores :+ outCore
-  // busTx := cores.map(_.io.tx).reduce(_ | _)
-  dataBusOr(0) := inCores(0).io.tx | inCores(1).io.tx
-  for (i <- 1 until CORES - 1) {
-    if (i < 3) {
-      dataBusOr(i) := dataBusOr(i-1) | neuCores(i-1).io.tx
-    } else {
-      dataBusOr(i) := dataBusOr(i-1) | outCore.io.tx
-    }
-  }
-  busTx := dataBusOr(CORES-2)
+  val cores = inCores ++ neuCores :+ outCore
+  busTx := cores.map(_.io.tx).reduce(_ | _)
+  //dataBusOr(0) := inCores(0).io.tx | inCores(1).io.tx
+  //for (i <- 1 until CORES - 1) {
+  //  if (i < 3) {
+  //    dataBusOr(i) := dataBusOr(i-1) | neuCores(i-1).io.tx
+  //  } else {
+  //    dataBusOr(i) := dataBusOr(i-1) | outCore.io.tx
+  //  }
+  //}
+  //busTx := dataBusOr(CORES-2)
 
-  for (i <- 0 until CORES) {
-    if (i < 2) {
-      inCores(i).io.rx       := busTx
-      busArbiter.io.reqs(i)  := inCores(i).io.req
-      inCores(i).io.grant    := busArbiter.io.grants(i)
-    } else if (i < 4) {
-      neuCores(i-2).io.rx    := busTx
-      busArbiter.io.reqs(i)  := neuCores(i-2).io.req
-      neuCores(i-2).io.grant := busArbiter.io.grants(i)
-    } else {
-      outCore.io.rx          := busTx
-      busArbiter.io.reqs(i)  := outCore.io.req
-      outCore.io.grant       := busArbiter.io.grants(i)
-    }
+  for (c <- cores.zipWithIndex) {
+    c._1.io.rx := busTx
+    busArbiter.io.reqs(c._2) := c._1.io.req
+    c._1.io.grant := busArbiter.io.grants(c._2)
   }
+  //for (i <- 0 until CORES) {
+  //  if (i < 2) {
+  //    inCores(i).io.rx       := busTx
+  //    busArbiter.io.reqs(i)  := inCores(i).io.req
+  //    inCores(i).io.grant    := busArbiter.io.grants(i)
+  //  } else if (i < 4) {
+  //    neuCores(i-2).io.rx    := busTx
+  //    busArbiter.io.reqs(i)  := neuCores(i-2).io.req
+  //    neuCores(i-2).io.grant := busArbiter.io.grants(i)
+  //  } else {
+  //    outCore.io.rx          := busTx
+  //    busArbiter.io.reqs(i)  := outCore.io.req
+  //    outCore.io.grant       := busArbiter.io.grants(i)
+  //  }
+  //}
 }
 
 object NeuromorphicProcessor extends App {
