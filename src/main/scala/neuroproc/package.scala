@@ -43,7 +43,7 @@ package object neuroproc {
   val neuronsInCore = Array(256, 228, 200, 200, 200) // Neurons mapped to each core, in/outcores don't matter as they are used controlunit in neuron core
 
   // The control signals bundle used for neuron evaluators
-  class EvalCntrSigs() extends Bundle() {
+  class EvalCntrSigs extends Bundle {
     val potSel = UInt(2.W)        // 0: dataIn, 1: sum, 2: potReg
     val spikeSel = UInt(2.W)      // 0: >thres, 1: reset, 2,3: keep
     val refracSel = UInt(1.W)     // 0: dataIn, 1: RefracReg
