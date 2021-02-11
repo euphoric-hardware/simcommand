@@ -27,7 +27,6 @@ parser.add_argument("--time", type=int, default=500)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--update_interval", type=int, default=250)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--device_id", type=int, default=0)
 parser.set_defaults(gpu=False)
 
 args = parser.parse_args()
@@ -42,7 +41,6 @@ time = args.time
 dt = args.dt
 update_interval = args.update_interval
 gpu = args.gpu
-device_id = args.device_id
 
 ###############################################################################
 # Setup                                                                       #
@@ -50,7 +48,7 @@ device_id = args.device_id
 # Network and GPU-related setup
 print('Setting up network')
 network = get_default_net()
-device = torch.device(f'cuda:{device_id}' if gpu and torch.cuda.is_available() else 'cpu')
+device = torch.device(f'cuda' if gpu and torch.cuda.is_available() else 'cpu')
 print(f'Using device = {str(device)}')
 network.to(device)
 if gpu and torch.cuda.is_available():
@@ -113,7 +111,7 @@ try:
         accuracy = {"all": [], "proportion": []}
         spike_record = torch.zeros(update_interval, time, n_neurons)
         print("Begin training.")
-        for (i, datum) in enumerate(train_loader):
+        for (i, datum) in tqdm(enumerate(train_loader)):
             image = audio_enc(datum['audio']).to(device)
             label = label_enc(datum['label']).to(device)
 
