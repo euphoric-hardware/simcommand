@@ -77,19 +77,18 @@ test_data.process_data()
 train_loader = torch.utils.data.DataLoader(train_data, batch_size=1)
 valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=1)
 test_loader  = torch.utils.data.DataLoader(test_data,  batch_size=1)
-# TODO: Replace this with more efficient alternative!
 audio_enc = RateEncoder(time=time, dt=dt)
 label_enc = NullEncoder()
 n_classes = 10
 per_class = int(n_neurons / n_classes)
 
 # Recording stuff throughout the training
-spike_record = torch.zeros(update_interval, time, n_neurons)
-assignments = -torch.ones_like(torch.Tensor(n_neurons))
-proportions = torch.zeros_like(torch.Tensor(n_neurons, n_classes))
-rates = torch.zeros_like(torch.Tensor(n_neurons, n_classes))
+spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
+assignments = -torch.ones(n_neurons, device=device)
+proportions = torch.zeros((n_neurons, n_classes), device=device)
+rates = torch.zeros((n_neurons, n_classes), device=device)
 accuracy = {"all": [], "proportion": []}
-labels = torch.empty(update_interval)
+labels = []
 spikes = {}
 for layer in set(network.layers):
     spikes[layer] = Monitor(network.layers[layer], state_vars=["s"], time=time)
@@ -109,31 +108,30 @@ try:
         # Training
         network.train(mode=True)
         accuracy = {"all": [], "proportion": []}
-        spike_record = torch.zeros(update_interval, time, n_neurons)
+        spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
         print("Begin training.")
         for (i, datum) in tqdm(enumerate(train_loader)):
             image = audio_enc(datum['audio']).to(device)
             label = label_enc(datum['label']).to(device)
 
             if i % update_interval == 0 and i > 0:
-                input_exc_weights = network.connections[("X", "Ae")].w
-                w_arg = 0.0
-                for i in range (22*22):
-                   for j in range(n_neurons):
-                       w_arg += input_exc_weights[i, j]
-                print(w_arg /((22*22)*n_neurons))
+                # Get a tensor of labels
+                label_tensor = torch.Tensor(labels, device=device)
+
                 # Get network predictions.
-                all_activity_pred = all_activity(spike_record, assignments, n_classes)
+                all_activity_pred = all_activity(
+                    spike_record, assignments, n_classes
+                )
                 proportion_pred = proportion_weighting(
                     spike_record, assignments, proportions, n_classes
                 )
 
                 # Compute network accuracy according to available classification strategies.
                 accuracy["all"].append(
-                    100 * torch.sum(labels.long() == all_activity_pred).item() / update_interval
+                    100 * torch.sum(label_tensor.long() == all_activity_pred).item() / update_interval
                 )
                 accuracy["proportion"].append(
-                    100 * torch.sum(labels.long() == proportion_pred).item() / update_interval
+                    100 * torch.sum(label_tensor.long() == proportion_pred).item() / update_interval
                 )
 
                 print('\nAll activity accuracy: {:.2f} (last), {:.2f} (average), {:.2f} (best)'.format(
@@ -145,10 +143,12 @@ try:
                 ))
 
                 # Assign labels to excitatory layer neurons.
-                assignments, proportions, rates = assign_labels(spike_record, labels, n_classes, rates)
+                assignments, proportions, rates = assign_labels(spike_record, label_tensor, n_classes, rates)
 
-            #Add the current label to the list of labels for this update_interval
-            labels[i % update_interval] = label[0]
+                # Clear list of labels
+                labels = []
+
+            labels.append(label)
 
             # Run the network on the input. Clamps expected output neurons forcing them to spike.
             choice = np.random.choice(per_class, size=n_clamp, replace=False)
@@ -170,13 +170,13 @@ try:
         network.train(mode=False)
         print("Begin validation.")
         accuracy = {"all": 0, "proportion": 0}
-        spike_record = torch.zeros(1, int(time / dt), n_neurons)
+        spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
         for (i, datum) in tqdm(enumerate(valid_loader)):
             image = audio_enc(datum['audio']).to(device)
             label = label_enc(datum['label']).to(device)
             inputs = {"X": image.view(time, 1, 1, 22, 22)}
             # Run the network on the input
-            network.run(inputs=inputs, time=time, input_time_dim=1)
+            network.run(inputs=inputs, time=time)
             # Add to spike record
             spike_record[0] = spikes["Ae"].get("s").squeeze()
             # Get network predictions
@@ -202,13 +202,13 @@ try:
     print('Begin test.')
     network.train(mode=False)
     accuracy = {"all": 0, "proportion": 0}
-    spike_record = torch.zeros(1, int(time / dt), n_neurons)
+    spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
     for datum in tqdm(test_loader):
         image = audio_enc(datum['audio']).to(device)
         label = label_enc(datum['label']).to(device)
         inputs = {"X": image.view(time, 1, 1, 22, 22)}
         # Run the network on the input
-        network.run(inputs=inputs, time=time, input_time_dim=1)
+        network.run(inputs=inputs, time=time)
         # Add to spike record
         spike_record[0] = spikes["Ae"].get("s").squeeze()
         # Get network predictions
@@ -226,12 +226,8 @@ try:
     
     print(f'Overall test accuracy is {accuracy["all"] / len(test_loader.dataset):.2f}')
     print(f'Proportion weighting test accuracy is {accuracy["proportion"] / len(test_loader.dataset):.2f}')
-
 except KeyboardInterrupt:
     print('Keyboard interrupt caught.')
-except:
-    print('An error occurred in the training loop.')
-    exit(1)
 finally:
     import os
     if not os.path.isdir('pretrained'):
