@@ -126,10 +126,10 @@ try:
 
                 # Get network predictions.
                 all_activity_pred = all_activity(
-                    spike_record, assignments, n_classes
+                    spike_record.to(device), assignments.to(device), n_classes
                 ).to(device)
                 proportion_pred = proportion_weighting(
-                    spike_record, assignments, proportions, n_classes
+                    spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
                 ).to(device)
 
                 # Compute network accuracy according to available classification strategies.
@@ -187,10 +187,10 @@ try:
             spike_record[0] = spikes["Ae"].get("s").squeeze()
             # Get network predictions
             all_activity_pred = all_activity(
-                spike_record, assignments, n_classes
+                spike_record.to(device), assignments.to(device), n_classes
             ).to(device)
             proportion_pred = proportion_weighting(
-                spike_record, assignments, proportions, n_classes
+                spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
             ).to(device)
             # Compute accuracy
             accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())
@@ -221,10 +221,10 @@ try:
         spike_record[0] = spikes["Ae"].get("s").squeeze()
         # Get network predictions
         all_activity_pred = all_activity(
-            spike_record, assignments, n_classes
+            spike_record.to(device), assignments.to(device), n_classes
         ).to(device)
         proportion_pred = proportion_weighting(
-            spike_record, assignments, proportions, n_classes
+            spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
         ).to(device)
         # Compute accuracy
         accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())
