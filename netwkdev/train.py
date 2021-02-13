@@ -74,9 +74,15 @@ train_data.process_data()
 valid_data.process_data()
 test_data.process_data()
 # Wrap in dataloaders
-train_loader = torch.utils.data.DataLoader(train_data, batch_size=1)
-valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=1)
-test_loader  = torch.utils.data.DataLoader(test_data,  batch_size=1)
+train_loader = torch.utils.data.DataLoader(
+    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+)
+valid_loader = torch.utils.data.DataLoader(
+    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+)
+test_loader  = torch.utils.data.DataLoader(
+    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+)
 audio_enc = RateEncoder(time=time, dt=dt)
 label_enc = NullEncoder()
 n_classes = 10
@@ -116,15 +122,15 @@ try:
 
             if i % update_interval == 0 and i > 0:
                 # Get a tensor of labels
-                label_tensor = torch.Tensor(labels, device=device)
+                label_tensor = torch.Tensor(labels).to(device)
 
                 # Get network predictions.
                 all_activity_pred = all_activity(
                     spike_record, assignments, n_classes
-                )
+                ).to(device)
                 proportion_pred = proportion_weighting(
                     spike_record, assignments, proportions, n_classes
-                )
+                ).to(device)
 
                 # Compute network accuracy according to available classification strategies.
                 accuracy["all"].append(
@@ -152,7 +158,7 @@ try:
 
             # Run the network on the input. Clamps expected output neurons forcing them to spike.
             choice = np.random.choice(per_class, size=n_clamp, replace=False)
-            clamp = {"Ae": per_class * label[0].long() + torch.Tensor(choice).long()}
+            clamp = {"Ae": per_class * label[0].long() + torch.Tensor(choice).long().to(device)}
             inputs = {"X": image.view(time, 1, 1, 22, 22)}
             network.run(inputs=inputs, time=time, clamp=clamp)
 
@@ -180,10 +186,12 @@ try:
             # Add to spike record
             spike_record[0] = spikes["Ae"].get("s").squeeze()
             # Get network predictions
-            all_activity_pred = all_activity(spike_record, assignments, n_classes)
+            all_activity_pred = all_activity(
+                spike_record, assignments, n_classes
+            ).to(device)
             proportion_pred = proportion_weighting(
                 spike_record, assignments, proportions, n_classes
-            )
+            ).to(device)
             # Compute accuracy
             accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())
             accuracy["proportion"] += float(
@@ -212,10 +220,12 @@ try:
         # Add to spike record
         spike_record[0] = spikes["Ae"].get("s").squeeze()
         # Get network predictions
-        all_activity_pred = all_activity(spike_record, assignments, n_classes)
+        all_activity_pred = all_activity(
+            spike_record, assignments, n_classes
+        ).to(device)
         proportion_pred = proportion_weighting(
             spike_record, assignments, proportions, n_classes
-        )
+        ).to(device)
         # Compute accuracy
         accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())
         accuracy["proportion"] += float(
