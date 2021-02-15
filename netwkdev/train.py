@@ -25,6 +25,7 @@ parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=22.5)
 parser.add_argument("--time", type=int, default=500)
 parser.add_argument("--dt", type=int, default=1.0)
+parser.add_argument("--intensity", type=float, default=128.0)
 parser.add_argument("--update_interval", type=int, default=250)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.set_defaults(gpu=False)
@@ -39,6 +40,7 @@ exc = args.exc
 inh = args.inh
 time = args.time
 dt = args.dt
+intensity = args.intensity
 update_interval = args.update_interval
 gpu = args.gpu
 
@@ -115,9 +117,10 @@ try:
         network.train(mode=True)
         accuracy = {"all": [], "proportion": []}
         spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
+        labels = []
         print("Begin training.")
         for (i, datum) in tqdm(enumerate(train_loader)):
-            image = audio_enc(datum['audio']).to(device)
+            image = audio_enc(datum['audio']).to(device) * intensity
             label = label_enc(datum['label']).to(device)
 
             if i % update_interval == 0 and i > 0:
@@ -126,10 +129,10 @@ try:
 
                 # Get network predictions.
                 all_activity_pred = all_activity(
-                    spike_record.to(device), assignments.to(device), n_classes
+                    spike_record.to("cpu"), assignments.to("cpu"), n_classes
                 ).to(device)
                 proportion_pred = proportion_weighting(
-                    spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
+                    spike_record.to("cpu"), assignments.to("cpu"), proportions.to("cpu"), n_classes
                 ).to(device)
 
                 # Compute network accuracy according to available classification strategies.
@@ -187,10 +190,10 @@ try:
             spike_record[0] = spikes["Ae"].get("s").squeeze()
             # Get network predictions
             all_activity_pred = all_activity(
-                spike_record.to(device), assignments.to(device), n_classes
+                spike_record.to("cpu"), assignments.to("cpu"), n_classes
             ).to(device)
             proportion_pred = proportion_weighting(
-                spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
+                spike_record.to("cpu"), assignments.to("cpu"), proportions.to("cpu"), n_classes
             ).to(device)
             # Compute accuracy
             accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())
@@ -221,10 +224,10 @@ try:
         spike_record[0] = spikes["Ae"].get("s").squeeze()
         # Get network predictions
         all_activity_pred = all_activity(
-            spike_record.to(device), assignments.to(device), n_classes
+            spike_record.to("cpu"), assignments.to("cpu"), n_classes
         ).to(device)
         proportion_pred = proportion_weighting(
-            spike_record.to(device), assignments.to(device), proportions.to(device), n_classes
+            spike_record.to("cpu"), assignments.to("cpu"), proportions.to("cpu"), n_classes
         ).to(device)
         # Compute accuracy
         accuracy["all"] += float(torch.sum(label.long() == all_activity_pred).item())

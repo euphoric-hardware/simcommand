@@ -323,6 +323,9 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             
             # Replace negative values with zeros - required for encoding!
             filter_banks = np.where(filter_banks < 0, 0, filter_banks)
+
+            # Normalize the signal
+            filter_banks /= np.max(filter_banks)
             
             # Append the signal and its label to the lists
             with warnings.catch_warnings():
