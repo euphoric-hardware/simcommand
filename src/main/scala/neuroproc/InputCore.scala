@@ -210,5 +210,5 @@ class InputCore(coreID : Int) extends Module {
 }
 
 object InputCore extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new InputCore(0))
+  (new chisel3.stage.ChiselStage).emitVerilog(new InputCore(0), Array("--target-dir", "build"))
 }

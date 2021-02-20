@@ -217,11 +217,3 @@ class UartEcho(frequency: Int, baudRate: Int) extends Module {
     valid := false.B
   }
 }
-
-object Uart extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new Uart(FREQ, BAUDRATE))
-}
-
-object UartEcho extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new UartEcho(FREQ, BAUDRATE))
-}

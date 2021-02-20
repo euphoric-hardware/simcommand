@@ -5,6 +5,7 @@ from kwsonsnn.utils import get_default_net, download
 
 import argparse
 import numpy as np
+from pandas import DataFrame
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -17,10 +18,13 @@ from bindsnet.encoding import NullEncoder
 ###############################################################################
 print('Initializing parser')
 parser = argparse.ArgumentParser()
+parser.add_argument("--use_mnist", dest="use_mnist", action="store_true")
 parser.add_argument("--seed", type=int, default=2)
 parser.add_argument("--epochs", type=int, default=5)
 parser.add_argument("--n_neurons", type=int, default=200)
 parser.add_argument("--n_clamp", type=int, default=1)
+parser.add_argument("--n_train", type=int, default=-1)
+parser.add_argument("--n_valid", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=22.5)
 parser.add_argument("--time", type=int, default=500)
@@ -28,14 +32,17 @@ parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128.0)
 parser.add_argument("--update_interval", type=int, default=250)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.set_defaults(gpu=False)
+parser.set_defaults(use_mnist=False, gpu=False)
 
 args = parser.parse_args()
 
+use_mnist = args.use_mnist
 seed = args.seed
 epochs = args.epochs
 n_neurons = args.n_neurons
 n_clamp = args.n_clamp
+n_train = args.n_train
+n_valid = args.n_valid
 exc = args.exc
 inh = args.inh
 time = args.time
@@ -43,6 +50,11 @@ dt = args.dt
 intensity = args.intensity
 update_interval = args.update_interval
 gpu = args.gpu
+
+if use_mnist:
+    import os
+    from torchvision import transforms
+    from bindsnet.datasets import MNIST
 
 ###############################################################################
 # Setup                                                                       #
@@ -69,24 +81,45 @@ network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 print('Fetching the dataset')
 data_path = './data'
 download(data_path)
-train_data = SpeechCommandsDataset(data_path)
-valid_data = SpeechCommandsDataset(data_path, split='valid')
-test_data  = SpeechCommandsDataset(data_path, split='test')
-train_data.process_data()
-valid_data.process_data()
-test_data.process_data()
+train_data = MNIST(
+    RateEncoder(time=time, dt=dt),
+    None,
+    root=os.path.join(".", "mnist"),
+    download=True,
+    transform=transforms.Compose(
+        [transforms.Resize(size=(22,22)), transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
+    )
+) if use_mnist else SpeechCommandsDataset(data_path)
+valid_data = MNIST(
+    RateEncoder(time=time, dt=dt),
+    None,
+    root=os.path.join(".", "mnist"),
+    download=False,
+    transform=transforms.Compose(
+        [transforms.Resize(size=(22,22)), transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
+    ),
+    train=False
+) if use_mnist else SpeechCommandsDataset(data_path, split='valid')
+test_data = None if use_mnist else SpeechCommandsDataset(data_path, split='test')
+if not use_mnist:
+    train_data.process_data()
+    valid_data.process_data()
+    test_data.process_data()
 # Wrap in dataloaders
 train_loader = torch.utils.data.DataLoader(
-    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
 )
 valid_loader = torch.utils.data.DataLoader(
-    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
 )
-test_loader  = torch.utils.data.DataLoader(
-    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available()
+test_loader  = None if use_mnist else torch.utils.data.DataLoader(
+    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
 )
-audio_enc = RateEncoder(time=time, dt=dt)
-label_enc = NullEncoder()
+if not use_mnist:
+    audio_enc = RateEncoder(time=time, dt=dt)
+    label_enc = NullEncoder()
+n_train = n_train if n_train != -1 else len(train_loader.dataset)
+n_valid = n_valid if n_valid != -1 else len(valid_loader.dataset)
 n_classes = 10
 per_class = int(n_neurons / n_classes)
 
@@ -120,8 +153,10 @@ try:
         labels = []
         print("Begin training.")
         for (i, datum) in tqdm(enumerate(train_loader)):
-            image = audio_enc(datum['audio']).to(device) * intensity
-            label = label_enc(datum['label']).to(device)
+            if i > n_train:
+                break
+            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio']).to(device) * intensity
+            label = datum["label"] if use_mnist else label_enc(datum['label']).to(device)
 
             if i % update_interval == 0 and i > 0:
                 # Get a tensor of labels
@@ -180,9 +215,12 @@ try:
         print("Begin validation.")
         accuracy = {"all": 0, "proportion": 0}
         spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
+        confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
         for (i, datum) in tqdm(enumerate(valid_loader)):
-            image = audio_enc(datum['audio']).to(device)
-            label = label_enc(datum['label']).to(device)
+            if i > n_valid:
+                break
+            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio']).to(device) * intensity
+            label = datum["label"] if use_mnist else label_enc(datum['label']).to(device)
             inputs = {"X": image.view(time, 1, 1, 22, 22)}
             # Run the network on the input
             network.run(inputs=inputs, time=time)
@@ -200,22 +238,28 @@ try:
             accuracy["proportion"] += float(
                 torch.sum(label.long() == proportion_pred).item()
             )
+            confusion[label.long().item()][all_activity_pred.item()] += 1
             # Reset state variables
             network.reset_state_variables()
     
-        acc = accuracy["all"] / len(valid_loader.dataset)
-        propacc = accuracy["proportion"] / len(valid_loader.dataset)
+        acc = accuracy["all"] / n_valid #len(valid_loader.dataset)
+        propacc = accuracy["proportion"] / n_valid #len(valid_loader.dataset)
         best_network = network if acc > best_acc else best_network
         print(f'Results for epoch {ep}:')
         print(f'\tOverall validation accuracy is {acc:.2f}')
         print(f'\tProportion weighting test accuracy is {propacc:.2f}')
+        print('Confusion matrix:')
+        print(confusion)
+
+    if use_mnist:
+        exit(0)
 
     print('Begin test.')
     network.train(mode=False)
     accuracy = {"all": 0, "proportion": 0}
     spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
     for datum in tqdm(test_loader):
-        image = audio_enc(datum['audio']).to(device)
+        image = audio_enc(datum['audio']).to(device) * intensity
         label = label_enc(datum['label']).to(device)
         inputs = {"X": image.view(time, 1, 1, 22, 22)}
         # Run the network on the input

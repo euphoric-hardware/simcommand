@@ -43,21 +43,11 @@ class TransmissionSystem(coreID: Int) extends Module {
 
     when(~spikeUpdate(i)) {
       neuronIdMSB(i) := io.n
-
       spikeRegs(i) := io.spikes(i)
-      //when(io.spikes(i)) {
-      //  spikeRegs(i) := true.B
-      //}.otherwise {
-      //  spikeRegs(i) := false.B
-      //}
     }
 
     when(i.U === spikeEncoder.io.value) {
       io.data := coreID.U(log2Up(CORES).W) ## neuronIdMSB(i) ## spikeEncoder.io.value 
     }
   }
-}
-
-object TransmissionSystem extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new TransmissionSystem(0))
 }

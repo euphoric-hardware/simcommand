@@ -9,4 +9,6 @@ target/*
 test_run_dir/
 build/
 netwkdev/data*
+netwkdev/mnist*
+netwkdev/pretrained*
 netwkdev/kwsonsnn/__pycache__*

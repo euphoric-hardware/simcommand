@@ -101,5 +101,5 @@ class OutputCore(coreID : Int) extends Module {
 }
 
 object OutputCore extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new OutputCore(6))
+  (new chisel3.stage.ChiselStage).emitVerilog(new OutputCore(4), Array("--target-dir", "build"))
 }

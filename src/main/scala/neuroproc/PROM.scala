@@ -66,7 +66,3 @@ class PROM(coreID : Int, evalID : Int) extends Module{ // Deprecated
     }
   }
 }
-
-object PROM extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new PROM(4,0))
-}

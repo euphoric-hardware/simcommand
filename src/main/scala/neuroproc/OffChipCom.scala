@@ -150,7 +150,3 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module {
     }
   }
 }
-
-object OffChip extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new OffChipCom(FREQ, BAUDRATE))
-}

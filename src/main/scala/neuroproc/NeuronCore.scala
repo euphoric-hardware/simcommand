@@ -39,5 +39,5 @@ class NeuronCore(coreID: Int) extends Module {
 }
 
 object NeuronCore extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new NeuronCore(2))
+  (new chisel3.stage.ChiselStage).emitVerilog(new NeuronCore(2), Array("--target-dir", "build"))
 }

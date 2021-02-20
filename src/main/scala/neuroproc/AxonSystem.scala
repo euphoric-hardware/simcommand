@@ -85,7 +85,3 @@ class AxonSystem extends Module {
     addr1    := spikeCntReg
   }
 }
-
-object AxonSystem extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new AxonSystem())
-}

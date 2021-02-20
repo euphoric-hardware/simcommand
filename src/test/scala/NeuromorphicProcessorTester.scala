@@ -18,6 +18,24 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester wi
         dut =>
           dut.clock.setTimeout(FREQ)
 
+          // Check against reference results - only for seed = 42!
+          val src = scala.io.Source.fromFile("./src/test/scala/results.txt")
+          val lines = try {
+            src.mkString
+          } catch {
+            case e: FileNotFoundException => {
+              println("Incorrect path to results file")
+              ""
+            }
+            case e: IOException => {
+              println("Cannot open results file")
+              ""
+            }
+          } finally {
+            src.close
+          }
+          val results = lines.split(", ").map(_.toInt)
+
           def receiveByte(byte: UInt) = {
             // Start bit
             dut.io.uartRx.poke(false.B)
@@ -86,23 +104,6 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester wi
           receive = false
           rec.join()
 
-          // Check against reference results - only for seed = 42!
-          val src = scala.io.Source.fromFile("results.txt")
-          val lines = try {
-            src.mkString
-          } catch {
-            case e: FileNotFoundException => {
-              println("Incorrect path to results file")
-              ""
-            }
-            case e: IOException => {
-              println("Cannot open results file")
-              ""
-            }
-          } finally {
-            src.close
-          }
-          val results = lines.split(", ").map(_.toInt)
           assert(results.length == spikes.length, "number of spikes does not match expected")
           assert(results.zip(spikes).map(x => x._1 == x._2).reduce(_ && _), "spikes do not match expected")
       }

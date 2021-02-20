@@ -79,5 +79,5 @@ class NeuromorphicProcessor extends Module {
 }
 
 object NeuromorphicProcessor extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build"), () => new NeuromorphicProcessor)
+  (new chisel3.stage.ChiselStage).emitVerilog(new NeuromorphicProcessor, Array("--target-dir", "build"))
 }
