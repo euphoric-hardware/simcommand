@@ -68,23 +68,23 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         else:
             audio = self.audio[ind]
 
-            # Shift signal
-            size = audio.shape[0] // 6
-            rnd  = np.random.randint(-size, size+1)
-            newA = torch.clone(audio)
-            if not rnd == 0:
-                fill = torch.rand(abs(rnd), audio.shape[1]) * torch.mean(audio).item()
-                if rnd > 0:
-                    newA[:rnd, :] = fill
-                    newA[rnd:, :] = audio[:-rnd, :]
-                else:
-                    newA[:rnd, :] = audio[-rnd:, :]
-                    newA[rnd:, :] = fill
-            audio = newA
+            ## Shift signal
+            #size = audio.shape[0] // 6
+            #rnd  = np.random.randint(-size, size+1)
+            #newA = torch.clone(audio)
+            #if not rnd == 0:
+            #    fill = torch.rand(abs(rnd), audio.shape[1]) * torch.mean(audio).item()
+            #    if rnd > 0:
+            #        newA[:rnd, :] = fill
+            #        newA[rnd:, :] = audio[:-rnd, :]
+            #    else:
+            #        newA[:rnd, :] = audio[-rnd:, :]
+            #        newA[rnd:, :] = fill
+            #audio = newA
 
-            # Add noise
-            audio += torch.rand(audio.shape[0], audio.shape[1]) * (torch.min(audio).item() / 5)
-            audio  = torch.where(audio >= 0, audio, torch.zeros(audio.shape))
+            ## Add noise
+            #audio += torch.rand(audio.shape[0], audio.shape[1]) * (torch.min(audio).item() / 5)
+            #audio  = torch.where(audio >= 0, audio, torch.zeros(audio.shape))
 
         label = self.labels[ind]
         return {'audio': audio, 'label': label}
@@ -133,7 +133,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         # If requested, shuffle the data
         if self.shuffle:
             perm = np.random.permutation(np.arange(labels.shape[0]))
-            audio, labels = [torch.Tensor(audio[_]) for _ in perm], labels[perm]
+            audio, labels = [audio[_] for _ in perm], labels[perm]
 
         return audio, labels, sr
 
@@ -158,6 +158,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
                 lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
                 lines = [os.path.join(self.path, x) for x in lines]
                 files.extend(lines)
+        files = list(map(lambda x: x.replace('\\', '/'), files))
         
         # If not all paths are files, download the full dataset
         if not all([os.path.isfile(f) for f in files]):
@@ -191,7 +192,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         pbar = tqdm(files)
         for f in pbar:
             # Get label from file name
-            label = list(filter(lambda x: x in f, self.kws))[0]
+            label = f.split('/')[-2]
             
             # Get signal from .wav file
             sr, signal = wavfile.read(f)
@@ -211,6 +212,9 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             signal = np.hstack(
                 (signal, np.random.normal(scale=abs(np.median(signal)), size=exp_sr-len(signal)))
             )
+
+            # Normalization for easier plotting
+            signal /= max(np.abs(signal))
             
             # Append the signal and its label to the lists
             with warnings.catch_warnings():
@@ -320,10 +324,10 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             filter_banks = np.where(filter_banks == 0, np.finfo(float).eps, filter_banks)
             # Convert to dB
             filter_banks = 20 * np.log10(filter_banks)
-            
+            # Fix negative dB numbers after normalization
+            filter_banks += np.abs(np.min(filter_banks))
             # Replace negative values with zeros - required for encoding!
             filter_banks = np.where(filter_banks < 0, 0, filter_banks)
-
             # Normalize the signal
             filter_banks /= np.max(filter_banks)
             

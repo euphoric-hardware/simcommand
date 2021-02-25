@@ -21,7 +21,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--use_mnist", dest="use_mnist", action="store_true")
 parser.add_argument("--seed", type=int, default=2)
 parser.add_argument("--epochs", type=int, default=5)
-parser.add_argument("--n_neurons", type=int, default=200)
 parser.add_argument("--n_clamp", type=int, default=1)
 parser.add_argument("--n_train", type=int, default=-1)
 parser.add_argument("--n_valid", type=int, default=-1)
@@ -39,7 +38,6 @@ args = parser.parse_args()
 use_mnist = args.use_mnist
 seed = args.seed
 epochs = args.epochs
-n_neurons = args.n_neurons
 n_clamp = args.n_clamp
 n_train = args.n_train
 n_valid = args.n_valid
@@ -62,9 +60,10 @@ if use_mnist:
 # Network and GPU-related setup
 print('Setting up network')
 network = get_default_net()
+n_neurons = 200
 device = torch.device(f'cuda' if gpu and torch.cuda.is_available() else 'cpu')
 print(f'Using device = {str(device)}')
-network.to(device)
+network = network.to(device)
 if gpu and torch.cuda.is_available():
     torch.cuda.manual_seed(seed)
 else:
