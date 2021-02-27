@@ -187,6 +187,18 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         audio, labels = [], []
         exp_sr, _ = wavfile.read(files[0])
 
+        # For subsampling - to center the audio, the subsampled frames are weighted
+        # by a window giving central samples greater weight
+        frame_length, frame_stride = 8000, 1000
+        num_frames = (exp_sr - frame_length) // frame_stride + 1
+        indices = (
+            np.tile(np.arange(0, frame_length), (num_frames, 1))
+            + np.tile(
+                np.arange(0, num_frames * frame_stride, frame_stride), (frame_length, 1)
+            ).T
+        )
+        weight = np.tile(np.blackman(frame_length), (num_frames, 1))
+
         # For each file, fetch the audio signal
         print(f'Fetching audio from {len(files)} files. Snippets padded to length of 1 second = {exp_sr} samples.')
         pbar = tqdm(files)
@@ -212,6 +224,10 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             signal = np.hstack(
                 (signal, np.random.normal(scale=abs(np.median(signal)), size=exp_sr-len(signal)))
             )
+
+            # Pick out sub-part of the signal - first attempt uses 8000 samples (i.e., half)
+            frames = signal[indices.astype(np.int32, copy=False)]
+            signal = frames[np.argmax(np.sum(np.dot(np.abs(frames), weight.T), 1))]
 
             # Normalization for easier plotting
             signal /= max(np.abs(signal))
@@ -255,9 +271,9 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             # the same size as the images used as part of the previous work by Anthon (i.e., 22x22).
             # TODO: Make this code more flexible - for example allowing selection of frame_length.
             
-            # In seconds ...
-            frame_length = 0.085
-            frame_stride = 0.04
+            # In seconds ... (like Hello Edge now)
+            frame_length = 0.04
+            frame_stride = 0.02
             
             assert frame_length <= 1.0, (
                 f'frames should be shorter than or equal to signal length, got {frame_length}'
