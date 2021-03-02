@@ -342,8 +342,6 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             filter_banks = 20 * np.log10(filter_banks)
             # Fix negative dB numbers after normalization
             filter_banks += np.abs(np.min(filter_banks))
-            # Replace negative values with zeros - required for encoding!
-            filter_banks = np.where(filter_banks < 0, 0, filter_banks)
             # Normalize the signal
             filter_banks /= np.max(filter_banks)
             

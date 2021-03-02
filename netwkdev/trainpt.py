@@ -21,7 +21,7 @@ print('Initializing parser')
 parser = argparse.ArgumentParser()
 parser.add_argument("--use_mnist", dest="use_mnist", action="store_true")
 parser.add_argument("--seed", type=int, default=2)
-parser.add_argument("--epochs", type=int, default=5)
+parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--n_train", type=int, default=-1)
 parser.add_argument("--n_valid", type=int, default=-1)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
@@ -129,7 +129,7 @@ def cust_crit(Y_hat, Y):
     Y_hat = Y_hat.sum(1)
 
     # One-hot encode Y
-    oh = torch.zeros(n_classes)
+    oh = torch.zeros(n_classes, device=device)
     oh[Y.long().item()] = 1
     Y = oh
 
@@ -142,12 +142,13 @@ def cust_crit(Y_hat, Y):
 lr = 0.0005
 criterion = cust_crit
 optimizer = optim.Adam(network.parameters(), lr=lr)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 try:
     print('Begin training loop.')
     epochbar = tqdm(range(epochs))
     for ep in epochbar:
         # Training
+        print(f'Epoch {ep}, learning rate {scheduler.get_lr()}')
         network.train()
         hit = 0
         epoch_training_loss = 0
@@ -165,7 +166,7 @@ try:
 
             if target.long().item() == get_pred(output).long().item():
                 hit += 1
-        print(f'Epoch {ep}, training loss: {epoch_training_loss / n_train}, accuracy: {hit / n_train}')
+        print(f'\ttraining loss: {epoch_training_loss / n_train}, accuracy: {hit / n_train}')
         scheduler.step()
 
         # Validation
@@ -186,7 +187,7 @@ try:
                 confusion[target.long().item()][get_pred(output).long().item()] += 1
                 if target.long().item() == get_pred(output).long().item():
                     hit += 1
-        print(f'Epoch {ep}, validation loss: {epoch_validation_loss / n_valid}, accuracy: {hit / n_valid}')
+        print(f'\tvalidation loss: {epoch_validation_loss / n_valid}, accuracy: {hit / n_valid}')
         print('Confusion matrix:')
         print(confusion)
 
