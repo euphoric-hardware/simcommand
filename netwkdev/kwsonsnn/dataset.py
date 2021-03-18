@@ -9,15 +9,25 @@ import numpy as np
 from scipy.io import wavfile
 import warnings
 from tqdm import tqdm
+import tarfile
+from urllib.request import urlretrieve
 
 class SpeechCommandsDataset(torch.utils.data.Dataset):
     """
     Handles loading and saving of the Speech Commands audio dataset `(link)
     <https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html>`_.
     """
+    url = 'http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz'
+    keywords = ['_background_noise_', 'bed', 'bird', 'cat', 'dog', 'down', 'eight', \
+                'five', 'four', 'go', 'happy', 'house', 'left', 'marvin', 'nine',   \
+                'no', 'off', 'on', 'one', 'right', 'seven', 'sheila', 'six', 'stop',\
+                'three', 'tree', 'two', 'up', 'wow', 'yes', 'zero']
+    files = ['LICENSE', 'README.md', 'testing_list.txt', 'validation_list.txt']
+
     def __init__(
         self,
         path: str,
+        download: bool = False,
         shuffle: bool = True,
         split: str = 'train',
         num_samples: int = -1,
@@ -28,6 +38,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         and unzipped in ``./path``.
 
         :param path: Pathname of directory in which to store the dataset.
+        :param download: Whether to download the dataset.
         :param shuffle: Whether to randomly permute order of dataset.
         :param split: Train, test, or validation split; in ``{'train', 'test', 'valid'}``.
         :param num_samples: Number of samples to pass to the batch.
@@ -40,6 +51,10 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         self.shuffle = shuffle
         self.num_samples = num_samples
         self.kws = kws
+
+        # Download the dataset if requested
+        if download:
+            self._download()
 
         # Check that specified keywords are legal
         labels = []
@@ -55,6 +70,9 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             self.audio, self.labels, self.sr = self._get_test_or_valid('valid' in split.lower())
         else:
             raise ValueError("split must be one of 'train', 'test', or 'valid'")
+        
+        # Process the data
+        self._process_data()
 
     def __len__(self):
         return len(self.audio)
@@ -67,24 +85,6 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             audio = self.audio[ind][:self.num_samples]
         else:
             audio = self.audio[ind]
-
-            ## Shift signal
-            #size = audio.shape[0] // 6
-            #rnd  = np.random.randint(-size, size+1)
-            #newA = torch.clone(audio)
-            #if not rnd == 0:
-            #    fill = torch.rand(abs(rnd), audio.shape[1]) * torch.mean(audio).item()
-            #    if rnd > 0:
-            #        newA[:rnd, :] = fill
-            #        newA[rnd:, :] = audio[:-rnd, :]
-            #    else:
-            #        newA[:rnd, :] = audio[-rnd:, :]
-            #        newA[rnd:, :] = fill
-            #audio = newA
-
-            ## Add noise
-            #audio += torch.rand(audio.shape[0], audio.shape[1]) * (torch.min(audio).item() / 5)
-            #audio  = torch.where(audio >= 0, audio, torch.zeros(audio.shape))
 
         label = self.labels[ind]
         return {'audio': audio, 'label': label}
@@ -141,7 +141,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         self, valid: bool = False
     ) -> Tuple[List[torch.Tensor], torch.Tensor, int]:
         """
-        Get the test set split of the Speech Commands dataset.
+        Get the validation or test set split of the Speech Commands dataset.
 
         :param valid: Whether to fetch test or validation split.
         :return: Speech Commands test audio and labels.
@@ -173,6 +173,38 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             audio, labels = [torch.Tensor(audio[_]) for _ in perm], labels[perm]
 
         return audio, labels, sr
+    
+    def _download(self) -> None:
+        """
+        Downloads and unzips the Speech Commands dataset, if it is not already downloaded.
+        """
+        tar_name = 'dataset.tar.gz'
+
+        def dataset_avail() -> bool:
+            return all(map(lambda x: os.path.exists(os.path.join(self.path, x)), SpeechCommandsDataset.keywords)) \
+                   and all(map(lambda x: os.path.isfile(os.path.join(self.path, x)), SpeechCommandsDataset.files))
+
+        def tarfile_avail() -> bool:
+            return os.path.isfile(os.path.join(self.path, tar_name))
+
+        # Create directory if it does not exist
+        if not os.path.isdir(self.path):
+            os.mkdir(self.path)
+        
+        # Check if the dataset is already downloaded
+        if not dataset_avail():
+            if not tarfile_avail():
+                # Download the dataset file
+                urlretrieve(url, os.path.join(self.path, tar_name))
+
+            # Extracting leads to all data folders being present in ``data_path``
+            cwd = os.getcwd()
+            os.chdir(self.path)
+            f = tarfile.open(tar_name, 'r:gz')
+            f.extractall()
+            f.close()
+            os.remove(tar_name)
+            os.chdir(cwd)
 
     def _fetch_data(
         self, files: Iterable[str]
@@ -239,7 +271,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         
         return audio, np.array(labels), exp_sr
     
-    def process_data(self) -> None:
+    def _process_data(self) -> None:
         """
         Applies common FFT-related techniques to the audio signals but leaves
         the labels. Must be called explicitly to affect the dataset. Non-reversible.

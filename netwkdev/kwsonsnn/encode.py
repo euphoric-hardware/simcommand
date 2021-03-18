@@ -41,7 +41,7 @@ def rate(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> torch.Ten
     times[times >= time + 1] = 0
 
     # Create tensor of spikes.
-    spikes = torch.zeros(time + 1, size).byte()
+    spikes = torch.zeros(time + 1, size, device=datum.device).byte()
     spikes[times, torch.arange(size)] = 1
     spikes = spikes[1:]
 
@@ -105,7 +105,7 @@ def rankOrderDirect(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -
 
     # Compute encoding. One spike in each time step based on sorted data.
     spikeTimes = torch.argsort(datum)
-    spikes = torch.zeros(time*size)
+    spikes = torch.zeros(time*size, device=datum.device)
     for i in range(min(time, size)):
         spikes[i*size + spikeTimes[i]] = 1
 

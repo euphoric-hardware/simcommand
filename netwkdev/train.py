@@ -1,7 +1,7 @@
 from kwsonsnn.model import ShowCaseNet
 from kwsonsnn.dataset import SpeechCommandsDataset
 from kwsonsnn.encode import RateEncoder
-from kwsonsnn.utils import get_default_net, download
+from kwsonsnn.utils import get_default_net
 
 import argparse
 import numpy as np
@@ -69,17 +69,10 @@ if gpu and torch.cuda.is_available():
 else:
     torch.manual_seed(seed)
 
-# Voltage recording for excitatory and inhibitory layers.
-print('Setting up monitors')
-exc_voltage_monitor = Monitor(network.layers["Ae"], ["v"], time=time)
-inh_voltage_monitor = Monitor(network.layers["Ai"], ["v"], time=time)
-network.add_monitor(exc_voltage_monitor, name="exc_voltage")
-network.add_monitor(inh_voltage_monitor, name="inh_voltage")
-
 # Get the dataset
 print('Fetching the dataset')
+kws = ['up', 'down', 'left', 'right', 'on', 'off', 'yes', 'no', 'go', 'stop']
 data_path = './data'
-download(data_path)
 train_data = MNIST(
     RateEncoder(time=time, dt=dt),
     None,
@@ -88,7 +81,7 @@ train_data = MNIST(
     transform=transforms.Compose(
         [transforms.Resize(size=(22,22)), transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     )
-) if use_mnist else SpeechCommandsDataset(data_path)
+) if use_mnist else SpeechCommandsDataset(data_path, download=True, kws=kws)
 valid_data = MNIST(
     RateEncoder(time=time, dt=dt),
     None,
@@ -98,28 +91,25 @@ valid_data = MNIST(
         [transforms.Resize(size=(22,22)), transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     ),
     train=False
-) if use_mnist else SpeechCommandsDataset(data_path, split='valid')
-test_data = None if use_mnist else SpeechCommandsDataset(data_path, split='test')
-if not use_mnist:
-    train_data.process_data()
-    valid_data.process_data()
-    test_data.process_data()
+) if use_mnist else SpeechCommandsDataset(data_path, download=False, split='valid', kws=kws)
+test_data = None if use_mnist else SpeechCommandsDataset(data_path, download=False, split='test', kws=kws)
+
 # Wrap in dataloaders
 train_loader = torch.utils.data.DataLoader(
-    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=False
 )
 valid_loader = torch.utils.data.DataLoader(
-    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=False
 )
 test_loader  = None if use_mnist else torch.utils.data.DataLoader(
-    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=False
 )
 if not use_mnist:
     audio_enc = RateEncoder(time=time, dt=dt)
     label_enc = NullEncoder()
 n_train = n_train if n_train != -1 else len(train_loader.dataset)
 n_valid = n_valid if n_valid != -1 else len(valid_loader.dataset)
-n_classes = 10
+n_classes = 10 if use_mnist else len(kws)
 per_class = int(n_neurons / n_classes)
 
 # Recording stuff throughout the training
@@ -152,9 +142,9 @@ try:
         labels = []
         print("Begin training.")
         for (i, datum) in tqdm(enumerate(train_loader)):
-            if i > n_train:
+            if i >= n_train:
                 break
-            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio']).to(device) * intensity
+            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio'] * intensity).to(device)
             label = datum["label"] if use_mnist else label_enc(datum['label']).to(device)
 
             if i % update_interval == 0 and i > 0:
@@ -162,12 +152,15 @@ try:
                 label_tensor = torch.Tensor(labels).to(device)
 
                 # Get network predictions.
+                confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], columns=kws, index=kws)
                 all_activity_pred = all_activity(
                     spike_record.to("cpu"), assignments.to("cpu"), n_classes
                 ).to(device)
                 proportion_pred = proportion_weighting(
                     spike_record.to("cpu"), assignments.to("cpu"), proportions.to("cpu"), n_classes
                 ).to(device)
+                for j in range(len(label_tensor)):
+                    confusion[kws[label_tensor[j].long().item()]][kws[all_activity_pred[j].item()]] += 1
 
                 # Compute network accuracy according to available classification strategies.
                 accuracy["all"].append(
@@ -190,6 +183,8 @@ try:
 
                 # Clear list of labels
                 labels = []
+                print('Confusion matrix:')
+                print(confusion)
 
             labels.append(label)
 
@@ -198,10 +193,6 @@ try:
             clamp = {"Ae": per_class * label[0].long() + torch.Tensor(choice).long().to(device)}
             inputs = {"X": image.view(time, 1, 1, 22, 22)}
             network.run(inputs=inputs, time=time, clamp=clamp)
-
-            # Get voltage recording. Fetches voltage on both excitatory and inhibitory connections.
-            exc_voltages = exc_voltage_monitor.get("v")
-            inh_voltages = inh_voltage_monitor.get("v")
 
             # Add to spikes recording. The spikes are monitored constantly.
             spike_record[i % update_interval] = spikes["Ae"].get("s").view(time, n_neurons)
@@ -214,11 +205,11 @@ try:
         print("Begin validation.")
         accuracy = {"all": 0, "proportion": 0}
         spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
-        confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
+        confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], columns=kws, index=kws)
         for (i, datum) in tqdm(enumerate(valid_loader)):
-            if i > n_valid:
+            if i >= n_valid:
                 break
-            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio']).to(device) * intensity
+            image = datum["encoded_image"] if use_mnist else audio_enc(datum['audio'] * intensity).to(device)
             label = datum["label"] if use_mnist else label_enc(datum['label']).to(device)
             inputs = {"X": image.view(time, 1, 1, 22, 22)}
             # Run the network on the input
@@ -237,12 +228,12 @@ try:
             accuracy["proportion"] += float(
                 torch.sum(label.long() == proportion_pred).item()
             )
-            confusion[label.long().item()][all_activity_pred.item()] += 1
+            confusion[kws[label.long().item()]][kws[all_activity_pred.item()]] += 1
             # Reset state variables
             network.reset_state_variables()
     
-        acc = accuracy["all"] / n_valid #len(valid_loader.dataset)
-        propacc = accuracy["proportion"] / n_valid #len(valid_loader.dataset)
+        acc = accuracy["all"] / n_valid
+        propacc = accuracy["proportion"] / n_valid
         best_network = network if acc > best_acc else best_network
         print(f'Results for epoch {ep}:')
         print(f'\tOverall validation accuracy is {acc:.2f}')
@@ -257,8 +248,9 @@ try:
     network.train(mode=False)
     accuracy = {"all": 0, "proportion": 0}
     spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
+    confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], columns=kws, index=kws)
     for datum in tqdm(test_loader):
-        image = audio_enc(datum['audio']).to(device) * intensity
+        image = audio_enc(datum['audio'] * intensity).to(device)
         label = label_enc(datum['label']).to(device)
         inputs = {"X": image.view(time, 1, 1, 22, 22)}
         # Run the network on the input
@@ -277,11 +269,14 @@ try:
         accuracy["proportion"] += float(
             torch.sum(label.long() == proportion_pred).item()
         )
+        confusion[kws[label.long().item()]][kws[all_activity_pred.item()]] += 1
         # Reset state variables
         network.reset_state_variables()
     
     print(f'Overall test accuracy is {accuracy["all"] / len(test_loader.dataset):.2f}')
     print(f'Proportion weighting test accuracy is {accuracy["proportion"] / len(test_loader.dataset):.2f}')
+    print('Confusion matrix:')
+    print(confusion)
 except KeyboardInterrupt:
     print('Keyboard interrupt caught.')
 finally:

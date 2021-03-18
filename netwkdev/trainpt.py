@@ -1,9 +1,4 @@
-# MNIST results are quite stable across multiple runs. Speech Commands results
-# vary from one run to the next, although generally, each run has some set of
-# classes which are never predicted by the network.
-
 from kwsonsnn.dataset import SpeechCommandsDataset
-from kwsonsnn.utils import download
 
 import argparse
 from tqdm import tqdm
@@ -22,6 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--use_mnist", dest="use_mnist", action="store_true")
 parser.add_argument("--seed", type=int, default=2)
 parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--lr", type=float, default=0.0002)
 parser.add_argument("--n_train", type=int, default=-1)
 parser.add_argument("--n_valid", type=int, default=-1)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
@@ -32,6 +28,7 @@ args = parser.parse_args()
 use_mnist = args.use_mnist
 seed = args.seed
 epochs = args.epochs
+lr = args.lr
 n_train = args.n_train
 n_valid = args.n_valid
 gpu = args.gpu
@@ -62,7 +59,7 @@ class ShowCaseNetPT(nn.Module):
         )
 
     def forward(self, X):
-        return F.softmax(self.ff2(F.relu(self.ff1(X.view(-1)))))
+        return F.softmax(self.ff2(F.relu(self.ff1(X.view(-1)))), dim=0)
 
 network = ShowCaseNetPT()
 device = torch.device(f'cuda' if gpu and torch.cuda.is_available() else 'cpu')
@@ -75,15 +72,15 @@ else:
 
 # Get the dataset
 print('Fetching the dataset')
+kws = ['up', 'down', 'left', 'right', 'on', 'off', 'yes', 'no', 'go', 'stop']
 data_path = './data'
-download(data_path)
 train_data = MNIST(
     os.path.join(".", "mnist"), 
     download=True,
     transform=transforms.Compose(
         [transforms.Resize(size=(22,22)), transforms.ToTensor()]
     )
-) if use_mnist else SpeechCommandsDataset(data_path)
+) if use_mnist else SpeechCommandsDataset(data_path, download=True, kws=kws)
 valid_data = MNIST(
     os.path.join(".", "mnist"), 
     download=False,
@@ -91,12 +88,9 @@ valid_data = MNIST(
         [transforms.Resize(size=(22,22)), transforms.ToTensor()]
     ),
     train=False
-) if use_mnist else SpeechCommandsDataset(data_path, split='valid')
-test_data = None if use_mnist else SpeechCommandsDataset(data_path, split='test')
-if not use_mnist:
-    train_data.process_data()
-    valid_data.process_data()
-    test_data.process_data()
+) if use_mnist else SpeechCommandsDataset(data_path, download=False, split='valid', kws=kws)
+test_data = None if use_mnist else SpeechCommandsDataset(data_path, download=False, split='test', kws=kws)
+
 # Wrap in dataloaders
 train_loader = torch.utils.data.DataLoader(
     train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
@@ -109,7 +103,7 @@ test_loader  = None if use_mnist else torch.utils.data.DataLoader(
 )
 n_train = n_train if n_train != -1 else len(train_loader.dataset)
 n_valid = n_valid if n_valid != -1 else len(valid_loader.dataset)
-n_classes = 10
+n_classes = 10 if use_mnist else len(kws)
 
 # For checkpointing purposes
 best_network = network
@@ -139,16 +133,14 @@ def cust_crit(Y_hat, Y):
 ###############################################################################
 # Training, validation, and test loops                                        #
 ###############################################################################
-lr = 0.0005
 criterion = cust_crit
 optimizer = optim.Adam(network.parameters(), lr=lr)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 try:
     print('Begin training loop.')
     epochbar = tqdm(range(epochs))
     for ep in epochbar:
         # Training
-        print(f'Epoch {ep}, learning rate {scheduler.get_lr()}')
+        print(f'Epoch {ep}, learning rate {lr}')
         network.train()
         hit = 0
         epoch_training_loss = 0
@@ -167,7 +159,6 @@ try:
             if target.long().item() == get_pred(output).long().item():
                 hit += 1
         print(f'\ttraining loss: {epoch_training_loss / n_train}, accuracy: {hit / n_train}')
-        scheduler.step()
 
         # Validation
         network.eval()
@@ -208,7 +199,7 @@ try:
 
             if target.long().item() == get_pred(output).long().item():
                 hit += 1
-    print(f'Test loss: {test_loss / len(test_loader.dataset)}, accuracy: {hit / len(test_loader.dataset)}')
+    print(f'\ttest loss: {test_loss / len(test_loader.dataset)}, accuracy: {hit / len(test_loader.dataset)}')
 
 except KeyboardInterrupt:
     print('Keyboard interrupt caught.')

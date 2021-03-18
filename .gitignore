@@ -10,5 +10,7 @@ test_run_dir/
 build/
 netwkdev/data*
 netwkdev/mnist*
+netwkdev/smnist*
 netwkdev/pretrained*
 netwkdev/kwsonsnn/__pycache__*
+domaintest*
