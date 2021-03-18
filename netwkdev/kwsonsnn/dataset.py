@@ -17,11 +17,15 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
     Handles loading and saving of the Speech Commands audio dataset `(link)
     <https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html>`_.
     """
+    train_pickle = 'train.pt'
+    valid_pickle = 'valid.pt'
+    test_pickle  = 'test.pt'
+
     url = 'http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz'
-    keywords = ['_background_noise_', 'bed', 'bird', 'cat', 'dog', 'down', 'eight', \
-                'five', 'four', 'go', 'happy', 'house', 'left', 'marvin', 'nine',   \
-                'no', 'off', 'on', 'one', 'right', 'seven', 'sheila', 'six', 'stop',\
-                'three', 'tree', 'two', 'up', 'wow', 'yes', 'zero']
+    keywords = ['bed', 'bird', 'cat', 'dog', 'down', 'eight', 'five', 'four',   \
+                'go', 'happy', 'house', 'left', 'marvin', 'nine', 'no', 'off',  \
+                'on', 'one', 'right', 'seven', 'sheila', 'six', 'stop','three', \
+                'tree', 'two', 'up', 'wow', 'yes', 'zero']
     files = ['LICENSE', 'README.md', 'testing_list.txt', 'validation_list.txt']
 
     def __init__(
@@ -29,6 +33,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         path: str,
         download: bool = False,
         shuffle: bool = True,
+        preprocess: bool = True,
         split: str = 'train',
         num_samples: int = -1,
         kws: List[str] = ['up', 'down', 'left', 'right', 'on', 'off', 'yes', 'no', 'go', 'stop']
@@ -40,6 +45,7 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         :param path: Pathname of directory in which to store the dataset.
         :param download: Whether to download the dataset.
         :param shuffle: Whether to randomly permute order of dataset.
+        :param preprocess: Whether to preprocess the dataset.
         :param split: Train, test, or validation split; in ``{'train', 'test', 'valid'}``.
         :param num_samples: Number of samples to pass to the batch.
         :param kws: List of keywords to use; in {keywords in Speech Commands dataset}.
@@ -72,7 +78,8 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             raise ValueError("split must be one of 'train', 'test', or 'valid'")
         
         # Process the data
-        self._process_data()
+        if preprocess:
+            self._process_data()
 
     def __len__(self):
         return len(self.audio)
@@ -110,26 +117,45 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             else:
                 with open(file) as f:
                     lines = f.read().split('\n')
-                    lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
+                    #lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
                     lines = [os.path.join(self.path, x) for x in lines]
                     remove_files.extend(lines)
         # Fix difference between Win32 and Unix paths
         remove_files = list(map(lambda x: x.replace('\\', '/'), remove_files))
 
-        # First find which files to use
-        files = []
-        for d in [os.path.join(self.path, kw) for kw in self.kws]:
-            for root, _, filenames in os.walk(d):
-                files.extend(list(map(lambda x: os.path.join(root, x), filenames)))
-        # Fix difference between Win32 and Unix paths
-        files = list(map(lambda x: x.replace('\\', '/'), files))
+        # If the training set has not been fetched before, fetch the entire set
+        # and save it as a Pickle file
+        pickle_file = os.path.join(self.path, SpeechCommandsDataset.train_pickle)
+        if not os.path.isfile(pickle_file):
+            # Find all files
+            files = []
+            for d in [os.path.join(self.path, kw) for kw in SpeechCommandsDataset.keywords]:
+                for root, _, filenames in os.walk(d):
+                    files.extend(list(map(lambda x: os.path.join(root, x), filenames)))
+            # Fix difference between Win32 and Unix paths
+            files = list(map(lambda x: x.replace('\\', '/'), files))
 
-        # Remove files used as part of the other splits
-        files = list(set(files).difference(set(remove_files)))
+            # Remove files used as part of the other splits
+            files = list(set(files).difference(set(remove_files)))
 
-        # Fetch the processed data
-        audio, labels, sr = self._fetch_data(files)
+            # Fetch the unprocessed data
+            audio, labels, sr = self._fetch_data(files)
 
+            # Store as a Pickle file
+            torch.save((audio, labels, sr), open(pickle_file, 'wb'))
+
+        # Load the dataset from its Pickle file
+        all_audio, all_labels, sr = torch.load(open(pickle_file), 'rb')
+
+        # Get only the requested keywords
+        audio, labels = [], []
+        for a, l in zip(all_audio, all_labels):
+            if l in self.kws:
+                audio.append(a)
+                labels.append(l)
+        audio  = np.array(audio)
+        labels = np.array(labels)
+        
         # If requested, shuffle the data
         if self.shuffle:
             perm = np.random.permutation(np.arange(labels.shape[0]))
@@ -154,18 +180,36 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             raise FileNotFoundError(f"test split file {split_file} not found")
         else:
             with open(split_file) as f:
-                lines = f.read().split('\n')
-                lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
+                lines = f.read().split('\n')[:-2]
+                #lines = list(filter(lambda x: x[:x.find('/')] in self.kws, lines))
                 lines = [os.path.join(self.path, x) for x in lines]
                 files.extend(lines)
+        # Fix difference between Win32 and Unix paths
         files = list(map(lambda x: x.replace('\\', '/'), files))
+
+        # If the test or validation set has not been fetched before, fetch the entire
+        # set and save it as a Pickle file
+        pickle_file = os.path.join(self.path, 
+            SpeechCommandsDataset.valid_pickle if valid else SpeechCommandsDataset.test_pickle
+        )
+        if not os.path.isfile(pickle_file):
+            # Fetch the unprocessed data
+            audio, labels, sr = self._fetch_data(files)
+
+            # Store it as a Pickle file
+            torch.save((audio, labels, sr), open(pickle_file, 'wb'))        
         
-        # If not all paths are files, download the full dataset
-        if not all([os.path.isfile(f) for f in files]):
-            raise FileNotFoundError("dataset not found")
-        
-        # Fetch the processed data
-        audio, labels, sr = self._fetch_data(files)
+        # Load the dataset from its Pickle file
+        all_audio, all_labels, sr = torch.load(open(pickle_file, 'rb'))
+
+        # Get only the requested keywords
+        audio, labels = [], []
+        for a, l in zip(all_audio, all_labels):
+            if l in self.kws:
+                audio.append(a)
+                labels.append(l)
+        audio  = np.array(audio)
+        labels = np.array(labels)
         
         # If requested, shuffle the data
         if self.shuffle:
@@ -232,7 +276,6 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
         weight = np.tile(np.blackman(frame_length), (num_frames, 1))
 
         # For each file, fetch the audio signal
-        print(f'Fetching audio from {len(files)} files. Snippets padded to length of 1 second = {exp_sr} samples.')
         pbar = tqdm(files)
         for f in pbar:
             # Get label from file name
