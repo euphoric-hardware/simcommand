@@ -1,7 +1,6 @@
 from kwsonsnn.model import ShowCaseNet
 from kwsonsnn.dataset import SpeechCommandsDataset
 from kwsonsnn.encode import RateEncoder
-from kwsonsnn.utils import get_default_net
 
 import argparse
 import numpy as np
@@ -59,8 +58,18 @@ if use_mnist:
 ###############################################################################
 # Network and GPU-related setup
 print('Setting up network')
-network = get_default_net()
 n_neurons = 200
+network = ShowCaseNet(
+    n_inpt=22*22,
+    n_neurons=n_neurons,
+    exc=exc*1000,
+    inh=inh*1000,
+    dt=dt,
+    norm=78.4*1000,
+    nu=[0, 1e-2],
+    inpt_shape=(1, 22, 22),
+    theta_plus=0.05*1000
+)
 device = torch.device(f'cuda' if gpu and torch.cuda.is_available() else 'cpu')
 print(f'Using device = {str(device)}')
 network = network.to(device)
@@ -152,7 +161,12 @@ try:
                 label_tensor = torch.Tensor(labels).to(device)
 
                 # Get network predictions.
-                confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], columns=kws, index=kws)
+                if use_mnist:
+                    confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
+                else:    
+                    confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], 
+                        columns=kws, index=kws
+                    )
                 all_activity_pred = all_activity(
                     spike_record.to("cpu"), assignments.to("cpu"), n_classes
                 ).to(device)
@@ -205,7 +219,12 @@ try:
         print("Begin validation.")
         accuracy = {"all": 0, "proportion": 0}
         spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
-        confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], columns=kws, index=kws)
+        if use_mnist:
+            confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
+        else:    
+            confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], 
+                columns=kws, index=kws
+            )
         for (i, datum) in tqdm(enumerate(valid_loader)):
             if i >= n_valid:
                 break

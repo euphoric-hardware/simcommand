@@ -12,22 +12,23 @@ class ShowCaseNet(Network):
     # language=rst
     """
     Implements the spiking neural network architecture from `(Diehl & Cook 2015)
-    <https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full>`_.
+    <https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full>`_. Scaled
+    to fit the KWSonSNN accelerator.
     """
 
     def __init__(
         self,
         n_inpt: int,
         n_neurons: int = 200,
-        exc: float = 22.5,
-        inh: float = 22.5,
+        exc: float = 22.5*1000,
+        inh: float = 22.5*1000,
         dt: float = 1.0,
         nu: Optional[Union[float, Sequence[float]]] = (1e-4, 1e-2),
         reduction: Optional[callable] = None,
         wmin: float = 0.0,
         wmax: float = 1000.0,
-        norm: float = 78.4,
-        theta_plus: float = 0.05,
+        norm: float = 78.4*1000,
+        theta_plus: float = 0.05*1000,
         tc_theta_decay: float = 1e7,
         inpt_shape: Optional[Iterable[int]] = None,
     ) -> None:
