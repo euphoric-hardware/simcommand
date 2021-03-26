@@ -2,8 +2,7 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest._
 import chisel3._
 import chisel3.util.log2Up
 import chiseltest._
@@ -11,7 +10,7 @@ import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import chiseltest.internal.VerilatorBackendAnnotation
 
-class OffChipComTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class OffChipComTester extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Off-chip Communication"
 
   // Change these values for the tests - keep FREQ_L and BAUDRATE_L relatively low!

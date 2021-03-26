@@ -2,14 +2,13 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest._
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 
-class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class OCCtoMemTester extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Off-chip Communication with memory"
 
   it should "work with dual-port memory" taggedAs(SlowTest) in {

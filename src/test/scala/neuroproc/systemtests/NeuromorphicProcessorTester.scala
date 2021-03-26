@@ -2,15 +2,14 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest._
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{VcsBackendAnnotation, WriteVcdAnnotation}
 import java.io.{FileNotFoundException, IOException}
 
-class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Neuromorphic Processor"
 
   val bitDelay = FREQ / BAUDRATE + 1
