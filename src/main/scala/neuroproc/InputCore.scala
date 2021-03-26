@@ -3,39 +3,39 @@ package neuroproc
 import chisel3._
 import chisel3.util._
 
-class InputCore(coreID : Int) extends Module {
+class InputCore(coreID: Int) extends Module {
   val io = IO(new Bundle {
-    // To off chip communication
-    val offCCData  = Input(UInt(24.W))
-    val offCCValid = Input(Bool())
-    val offCCReady = Output(Bool())
+    val pmClkEn = Output(Bool())
+    val newTS   = Input(Bool())
 
+    // To off chip communication
     val offCCHSin  = Input(Bool())
     val offCCHSout = Output(Bool())
 
-    // To bus
+    // Memory interface
+    val memEn   = Output(Bool())
+    val memAddr = Output(UInt((RATEADDRWIDTH+1).W))
+    val memDo   = Input(UInt(RATEWIDTH.W))
+
+    // Bus interface
     val grant = Input(Bool())
     val req   = Output(Bool())
     val tx    = Output(UInt(GLOBALADDRWIDTH.W))
     val rx    = Input(UInt(GLOBALADDRWIDTH.W))
 
-    val nothing = Output(UInt())
+    val nothing = Output(UInt(log2Up(CORES).W))
   })
 
   // Unique unused output to make sure this module is made in multiple copies
   io.nothing := coreID.U
 
-  // Core always ready to receive input from off chip communication due to
-  // dual-ported memory
-  io.offCCReady := true.B
-
   // Interface to/from bus
-  val interface  = Module(new BusInterface(coreID))
-  interface.io.grant      := io.grant
-  io.req                  := interface.io.reqOut
-  io.tx                   := interface.io.tx
-  interface.io.rx         := io.rx
-  
+  val interface = Module(new BusInterface(coreID))
+  interface.io.grant := io.grant
+  io.req             := interface.io.reqOut
+  io.tx              := interface.io.tx
+  interface.io.rx    := io.rx
+
   // Spike transmission to/from interface
   val spikeTrans = Module(new TransmissionSystem(coreID))
   interface.io.spikeID    := spikeTrans.io.data
@@ -43,92 +43,26 @@ class InputCore(coreID : Int) extends Module {
   interface.io.reqIn      := spikeTrans.io.valid
 
   // Control FSM internal signals
-  val ts           = RegInit(0.U(RATEWIDTH.W))                       // Rate cannot be larger than no. of time steps per input
-  val pixcnt       = RegInit(0.U(RATEADDRWIDTH.W))                   // Same as log2Up(NEURONSPRCORE)
-  val pixcntLate   = RegNext(pixcnt)
-  val pixcntLater  = RegNext(pixcntLate)
-  val tsCycleCnt   = RegInit(CYCLESPRSTEP.U)                         // Count time step cycles down to 0
-  val phase        = RegInit(false.B)                                // Init to in phase (download first)
-  val cntrEna      = WireDefault(false.B)
-  val cntrPeriod   = Wire(UInt(RATEWIDTH.W))
-  val spikePulse   = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))  // Used to deliver spike pulses to transmission
-  val idle :: firstr :: spikegen :: lastgen :: sWait :: Nil = Enum(5)
-  val stateReg     = RegInit(idle)
-  val sPulseDecSig = WireDefault(EVALUNITS.U((log2Up(EVALUNITS)+1).W))
+  val idle :: firstr :: spikegen :: lastgen :: done :: Nil = Enum(5)
+  val state  = RegInit(idle)
+  val ts     = RegInit(0.U(RATEWIDTH.W))
+  val pixCnt = RegInit(0.U(RATEADDRWIDTH.W))
+  val pixCntLate  = RegNext(pixCnt)
+  val pixCntLater = RegNext(pixCntLate)
+  
   val shouldSpike  = Wire(Bool())
+  val spikePulse   = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B)))
+  val sPulseDecSig = WireDefault(EVALUNITS.U((log2Up(EVALUNITS)+1).W))
 
+  val phase = RegInit(false.B)
   io.offCCHSout := phase
-
-  // Memories when phase = 0 write to mem 1 read mem 0, when phase = 1 write to mem 0 read mem 1
-  val ena0     = Wire(Bool())
-  val wr0      = Wire(Bool()) //0: read, 1: write
-  val rdata0   = Wire(UInt(RATEWIDTH.W))
-  val wdata0   = Wire(UInt(RATEWIDTH.W))
-  val addr0    = Wire(UInt(RATEADDRWIDTH.W))
-  val rateMem0 = SyncReadMem(NEURONSPRCORE, UInt(RATEWIDTH.W))
-
-  rateMem0.suggestName("rateMem0"+coreID.toString)
-  rdata0 := DontCare
-  when(ena0) {
-    when(wr0) {
-      rateMem0(addr0) := wdata0
-    }.otherwise {
-      rdata0 := rateMem0(addr0)
-    }
-  }
-
-  val ena1     = Wire(Bool())
-  val wr1      = Wire(Bool())
-  val rdata1   = Wire(UInt(RATEWIDTH.W))
-  val wdata1   = Wire(UInt(RATEWIDTH.W))
-  val addr1    = Wire(UInt(RATEADDRWIDTH.W))
-  val rateMem1 = SyncReadMem(NEURONSPRCORE, UInt(RATEWIDTH.W))
-
-  rdata1 := DontCare
-  when(ena1) {
-    when(wr1) {
-      rateMem1(addr1) := wdata1
-    }.otherwise {
-      rdata1 := rateMem1(addr1)
-    }
-  }
-
-  // Memory selection logic
-  wdata0 := io.offCCData(RATEWIDTH-1, 0)
-  wdata1 := io.offCCData(RATEWIDTH-1, 0)
-
-  when (phase) {
-    ena0 := io.offCCValid
-    wr0  := true.B
-    addr0 := io.offCCData(23, 16)
-
-    ena1 := cntrEna
-    wr1 := false.B
-    cntrPeriod := rdata1 
-    addr1 := pixcnt
-  }.otherwise {
-    ena0 := cntrEna
-    wr0 := false.B
-    cntrPeriod := rdata0 
-    addr0 := pixcnt
-
-    ena1 := io.offCCValid
-    wr1  := true.B
-    addr1 := io.offCCData(23, 16)
-  }
-
-  // Time step cycle counter
-  tsCycleCnt := tsCycleCnt - 1.U
-  when(tsCycleCnt === 0.U) {
-    tsCycleCnt := CYCLESPRSTEP.U
-  }
 
   // Methods for spike generation
   def ratePeriodSpiker() = {
-    val res = Mux(ts === 0.U || cntrPeriod === 0.U, 1.U, ts % cntrPeriod)
+    val res = Mux(ts === 0.U || io.memDo === 0.U, 1.U, ts % io.memDo)
     res === 0.U
   }
-  def rankOrderPeriodSpiker() = ts === cntrPeriod
+  def rankOrderPeriodSpiker() = ts === io.memDo
 
   // Spike rates are encoded with periods
   if (RANKORDERENC)
@@ -137,35 +71,42 @@ class InputCore(coreID : Int) extends Module {
     shouldSpike := ratePeriodSpiker()
 
   // Control FSM
-  switch(stateReg) {
+  io.pmClkEn := true.B
+  io.memEn   := false.B
+  io.memAddr := Mux(phase, pixCnt + NEURONSPRCORE.U, pixCnt)
+  switch(state) {
     // State 0 - resets counters and waits for next time step
     is(idle) {
+      io.pmClkEn := false.B
       ts := 0.U
-      pixcnt := 0.U
-      when(io.offCCHSin =/= phase && tsCycleCnt === 0.U) {
-        stateReg := firstr
-        phase := ~phase
+      pixCnt := 0.U
+
+      when(io.offCCHSin =/= phase && io.newTS) {
+        io.pmClkEn := true.B
+        state := firstr
+        phase := !phase
       }
     }
 
     // State 1 - enables the memory for reading the first period
     is(firstr) {
-      cntrEna := true.B
-      pixcnt := pixcnt + 1.U
-      stateReg := spikegen
+      io.memEn := true.B
+      pixCnt := pixCnt + 1.U
+
+      state := spikegen
     }
 
     // State 2 - spikes for NEURONSPRCORE-1 neurons and enables the memory
     // for reading the last period
     is(spikegen) {
-      cntrEna := true.B
-      pixcnt := pixcnt + 1.U
+      io.memEn := true.B
+      pixCnt := pixCnt + 1.U
       when(shouldSpike) {
-        sPulseDecSig := 0.U(1.W) ## pixcntLate(log2Up(EVALUNITS)-1,0)
+        sPulseDecSig := 0.U(1.W) ## pixCntLate(log2Up(EVALUNITS)-1,0)
       }
 
-      when(pixcnt === (NEURONSPRCORE-1).U){
-        stateReg := lastgen
+      when(pixCnt === (NEURONSPRCORE-1).U){
+        state := lastgen
       }
     }
 
@@ -173,23 +114,26 @@ class InputCore(coreID : Int) extends Module {
     is(lastgen) {
       ts := ts + 1.U
       when(shouldSpike) {
-        sPulseDecSig := 0.U(1.W) ## pixcntLate(log2Up(EVALUNITS)-1,0)
+        sPulseDecSig := 0.U(1.W) ## pixCntLate(log2Up(EVALUNITS)-1,0)
       }
 
-      // When 500 time steps have passed, put the input core into idle mode
-      // till the next evaluation phase starts
-      when(ts === 499.U) {
-        stateReg := idle
-      }.otherwise {
-        stateReg := sWait
-      }
+      state := done
     }
 
-    // State 4 - waits till a new time step begins after all spiking has completed
-    is(sWait) {
-      pixcnt := 0.U
-      when(tsCycleCnt === 0.U) {
-        stateReg := firstr
+    // State 4 - disables the clock if this block has finished transmission of
+    // all its generated spikes (i.e., based on request from its bus interface)
+    is(done) {
+      when(!interface.io.reqOut && !io.newTS) {
+        io.pmClkEn := false.B
+      }
+
+      when(io.newTS) {
+        io.pmClkEn := true.B
+        when(ts === 499.U) {
+          state := idle
+        }.otherwise {
+          state := firstr
+        }
       }
     }
   }
@@ -203,7 +147,7 @@ class InputCore(coreID : Int) extends Module {
   }
 
   // Transmission connections
-  spikeTrans.io.n := pixcntLater(RATEADDRWIDTH-1, RATEADDRWIDTH-N)
+  spikeTrans.io.n := pixCntLater(RATEADDRWIDTH-1, RATEADDRWIDTH-N)
   for (i <- 0 until EVALUNITS) {
     spikeTrans.io.spikes(i) := spikePulse(i)
   }

@@ -4,6 +4,9 @@ import chisel3._
 
 class Neurons(coreID: Int) extends Module {
   val io = IO(new Bundle {
+    val done     = Output(Bool())
+    val newTS    = Input(Bool())
+
     // For axon system
     val inOut    = Output(Bool())
     val spikeCnt = Input(UInt(AXONIDWIDTH.W))
@@ -18,15 +21,17 @@ class Neurons(coreID: Int) extends Module {
 
   val controlUnit = Module(new ControlUnit(coreID))
   val evalUnits   = (0 until EVALUNITS).map(i => Module(new NeuronEvaluator))
-  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory2(coreID, i)))
+  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory(coreID, i)))
 
   io.inOut                := controlUnit.io.inOut
   controlUnit.io.spikeCnt := io.spikeCnt
   io.aAddr                := controlUnit.io.aAddr
   io.aEna                 := controlUnit.io.aEna
   controlUnit.io.aData    := io.aData
-
   io.n                    := controlUnit.io.n
+
+  io.done := controlUnit.io.done
+  controlUnit.io.newTS := io.newTS
 
   for (i <- 0 until EVALUNITS) {
     io.spikes(i) := controlUnit.io.spikes(i)

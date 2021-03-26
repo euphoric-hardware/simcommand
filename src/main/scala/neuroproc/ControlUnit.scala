@@ -5,6 +5,9 @@ import chisel3.util._
 
 class ControlUnit(coreID : Int) extends Module {
   val io = IO(new Bundle {
+    val done       = Output(Bool())
+    val newTS      = Input(Bool())
+
     // For evaluation memories
     val addr       = Output(UInt(EVALMEMADDRWIDTH.W))
     val wr         = Output(Bool()) //false: read, true: write
@@ -29,15 +32,13 @@ class ControlUnit(coreID : Int) extends Module {
   })
 
   val idle :: rRefrac :: rPot :: rDecay :: rWeight1 :: rWeight2 :: rBias :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(12)
-  val stateReg = RegInit(idle)
+  val state = RegInit(idle)
 
   val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
-  val tsCycleCnt     = RegInit(CYCLESPRSTEP.U) //count time step cycles down to 0
   val nNext          = Wire(UInt(N.W))
   val n              = RegNext(nNext) // time multiplex evaluation counter
   val aNext          = Wire(UInt(AXONIDWIDTH.W))
   val a              = RegNext(aNext) //axon system addr counter
-  val aLate          = RegNext(a) //axon system addr counter
   val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
   val inOut          = RegInit(false.B) //used to inform spike system of new timestep
   val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit have evaluated all mapped neurons
@@ -92,28 +93,25 @@ class ControlUnit(coreID : Int) extends Module {
   addrSpecific := 0.U
   evalAddr     := addrOffset + addrSpecific
 
-  // Time step cycle counter
-  tsCycleCnt := tsCycleCnt - 1.U
-  when(tsCycleCnt === 0.U) {
-    tsCycleCnt := CYCLESPRSTEP.U
-  }
-
   // Set evaluations units active state. (Usure still when all mapped neurons are evaluated)
   for (i <- 0 until EVALUNITS) {
     evalUnitActive(i) := nrNeuMapped > ((n << log2Up(EVALUNITS)) + i.U)
   }
 
   // Control FSM - runs once per time step
-  switch(stateReg) { 
+  io.done := false.B
+  switch(state) { 
     // State 0 - disables evaluators and waits for next time step
     is(idle) {
-      nNext := 0.U
-      aNext := 0.U
+      io.done := true.B
+      nNext   := 0.U
+      aNext   := 0.U
       io.evalEnable := false.B
-      when(tsCycleCnt === 0.U) {
+      when(io.newTS) {
+        io.done  := false.B
         spikeCnt := io.spikeCnt
         inOut    := ~inOut
-        stateReg := rRefrac
+        state    := rRefrac
       }
     }
 
@@ -128,7 +126,7 @@ class ControlUnit(coreID : Int) extends Module {
         localCntrSels(i).spikeSel := 1.U
       }
 
-      stateReg := rPot
+      state := rPot
     }
 
     // State 2 - read membrane potential
@@ -142,7 +140,7 @@ class ControlUnit(coreID : Int) extends Module {
         localCntrSels(i).refracSel := 0.U
       }
 
-      stateReg := rDecay
+      state := rDecay
     }
 
     // State 3 - read decay factor
@@ -160,9 +158,9 @@ class ControlUnit(coreID : Int) extends Module {
       }
 
       when(spikeCnt === 0.U) { 
-        stateReg := rBias
+        state := rBias
       }.otherwise {
-        stateReg := rWeight1
+        state := rWeight1
       }
     }
 
@@ -187,9 +185,9 @@ class ControlUnit(coreID : Int) extends Module {
       }
 
       when(spikeCnt === a) { 
-        stateReg := rBias
+        state := rBias
       }.otherwise {
-        stateReg := rWeight2
+        state := rWeight2
       }
     }
 
@@ -213,9 +211,9 @@ class ControlUnit(coreID : Int) extends Module {
       io.aEna := true.B
 
       when(spikeCnt === a - 1.U) { 
-        stateReg := rBias
+        state := rBias
       }.otherwise {
-        stateReg := rWeight2
+        state := rWeight2
       }
     }
 
@@ -241,7 +239,7 @@ class ControlUnit(coreID : Int) extends Module {
         }
       }
 
-      stateReg := rThresh
+      state := rThresh
     }
 
     // State 7 - read threshold set value
@@ -257,7 +255,7 @@ class ControlUnit(coreID : Int) extends Module {
         }
       }
       
-      stateReg := rRefracSet
+      state := rRefracSet
     }
 
     // State 8 - read refractory counter set value
@@ -271,7 +269,7 @@ class ControlUnit(coreID : Int) extends Module {
         localCntrSels(i).spikeSel := 0.U
       }
 
-      stateReg := wRefrac
+      state := wRefrac
     }
 
     // State 9 - write refractory counter
@@ -286,7 +284,7 @@ class ControlUnit(coreID : Int) extends Module {
         spikePulse(i) := io.spikeIndi(i)
       }
 
-      stateReg := rPotSet
+      state := rPotSet
     }
 
     // State A - read membrane potential set value
@@ -296,7 +294,7 @@ class ControlUnit(coreID : Int) extends Module {
       addrOffset   := OSPOTSET.U
       addrSpecific := n
 
-      stateReg     := wPot
+      state     := wPot
     }
 
     // State B - write membrane potential
@@ -313,9 +311,9 @@ class ControlUnit(coreID : Int) extends Module {
       aNext      := 0.U
       nNext      := n + 1.U
       when((nNext << log2Up(EVALUNITS)) >= nrNeuMapped ) {
-        stateReg := idle
+        state := idle
       }.otherwise {
-        stateReg := rRefrac
+        state := rRefrac
       }
     }
   }

@@ -52,22 +52,10 @@ package object neuroproc {
   }
 
   def JsArrayTo1DArray(jarray: JsArray): Array[Int] = {
-    //val jsonvallist = jarray.elements.toArray
-    //var returnArray : Array[Int] = Array()
-    //for (elem <- jsonvallist) returnArray = returnArray :+ elem.asInstanceOf[JsNumber].value.toInt
-    //return returnArray
     return jarray.elements.toArray.map(_.asInstanceOf[JsNumber].value.toInt)
   }
 
   def JsArrayTo2DArray(jarray: JsArray): Array[Array[Int]] = {
-    //val jsonvallist = jarray.elements.toArray
-    //var returnArray : Array[Array[Int]] = Array()
-    //for (arr <- jsonvallist){
-    //  var tempArr : Array[Int] = Array()
-    //  for (elem <- arr.asInstanceOf[JsArray].elements.toArray) tempArr = tempArr :+ elem.asInstanceOf[JsNumber].value.toInt
-    //  returnArray = returnArray :+ tempArr
-    //}
-    //return returnArray
     return jarray.elements.toArray.map(x => JsArrayTo1DArray(x.asInstanceOf[JsArray]))
   }
   

@@ -2,28 +2,28 @@ package neuroproc
 
 import chisel3._
 import chisel3.util._
-import spray.json._
 
 // This file is very hard coded for this project
 class OffChipCom(frequency: Int, baudRate: Int) extends Module {
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val tx = Output(Bool())
     val rx = Input(Bool())
 
-    // Valid/ready for in and out cores
-    val inC0Data  = Output(UInt(24.W))
-    val inC0Valid = Output(Bool())
-    val inC0Ready = Input(Bool())
-    
-    val inC1Data  = Output(UInt(24.W))
-    val inC1Valid = Output(Bool())
-    val inC1Ready = Input(Bool())
-    
-    val outCData  = Input(UInt(8.W))
-    val outCValid = Input(Bool())
-    val outCReady = Output(Bool())
+    // Memory interface
+    val inC0We    = Output(Bool())
+    val inC0Addr  = Output(UInt((RATEADDRWIDTH+1).W))
+    val inC0Di    = Output(UInt(RATEWIDTH.W))
 
-    // Synchronize channels for input cores
+    val inC1We    = Output(Bool())
+    val inC1Addr  = Output(UInt((RATEADDRWIDTH+1).W))
+    val inC1Di    = Output(UInt(RATEWIDTH.W))
+
+    // FIFO interface
+    val qEn    = Output(Bool())
+    val qData  = Input(UInt(8.W))
+    val qEmpty = Input(Bool())
+
+    // Synchronization ports for input cores
     val inC0HSin  = Input(Bool())
     val inC0HSout = Output(Bool())
 
@@ -31,50 +31,14 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module {
     val inC1HSout = Output(Bool())
   })
 
+  // UART module and relevant registers and wires
   val uart = Module(new Uart(frequency, baudRate))
-
   val txBuf = RegInit(0.U(8.W))
-  val txV   = RegInit(false.B)
-
-  val phase = RegInit(false.B) // Init to in phase. download first
-
-  val byteCnt = RegInit(0.U(2.W))
-  val pixCnt = RegInit(0.U(log2Up(INPUTSIZE).W))
-
-  val inC0V = RegInit(false.B)
-  val inC1V = RegInit(false.B)
-  
-  val addr1 = RegInit(0.U(8.W))
-  val addr0 = RegInit(0.U(8.W))
-  val rate1 = RegInit(0.U(8.W))
-  val rate0 = RegInit(0.U(8.W))
-
-  val inCData = Wire(UInt(24.W))
-
-  val idle :: start :: receiveW :: toCore :: Nil = Enum(4)
-  val stateReg = RegInit(idle)
-
-  // Concatenate buffers for a combined data word
-  inCData := addr0 ## rate1 ## rate0
+  val txV = RegInit(false.B)
 
   // RX logic
   uart.io.rxd := io.rx
   uart.io.rxReady := false.B
-
-  // Input core valid/ready logic
-  io.inC0HSout := phase
-  io.inC0Data  := inCData
-  io.inC0Valid := inC0V
-  when(inC0V && io.inC0Ready) {
-    inC0V := false.B
-  }
-
-  io.inC1HSout := phase
-  io.inC1Data  := inCData
-  io.inC1Valid := inC1V
-  when(inC1V && io.inC1Ready) {
-    inC1V := false.B
-  }
 
   // TX logic
   io.tx := uart.io.txd
@@ -84,15 +48,44 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module {
     txV := false.B
   }
 
-  // Output cores valid/ready logic
-  io.outCReady := false.B
-  when(io.outCValid && ~txV) { //not busy in receive loop
+  // From FIFO queue
+  val en = Wire(Bool())
+  val enReg = RegInit(false.B)
+  en := !io.qEmpty && !txV && !enReg
+  enReg := en
+  io.qEn := en
+  when(enReg) {
+    txBuf := io.qData
     txV := true.B
-    io.outCReady := true.B
-    txBuf := io.outCData
   }
 
+  // Data buffer registers
+  val addr1 = RegInit(0.U(8.W))
+  val addr0 = RegInit(0.U(8.W))
+  val rate1 = RegInit(0.U(8.W))
+  val rate0 = RegInit(0.U(8.W))
+
+  // Synchronization with input cores - init to in-phase, download first
+  val phase = RegInit(false.B)
+
+  // IO default values
+  val defAddr  = Mux(phase, addr0, addr0 + NEURONSPRCORE.U)(RATEADDRWIDTH, 0)
+  val defData  = (rate1 ## rate0)(RATEWIDTH-1, 0)
+  io.inC0HSout := phase
+  io.inC0We    := false.B
+  io.inC0Addr  := defAddr
+  io.inC0Di    := defData
+
+  io.inC1HSout := phase
+  io.inC1We    := false.B
+  io.inC1Addr  := defAddr
+  io.inC1Di    := defData
+
   // Control FSM
+  val idle :: start :: receiveW :: toCore :: Nil = Enum(4)
+  val stateReg = RegInit(idle)
+  val byteCnt  = RegInit(0.U(2.W))
+  val pixCnt   = RegInit(0.U(log2Up(INPUTSIZE).W))
   switch(stateReg) {
     is(idle) {
       // When the input cores are in phase, transfers can begin
@@ -123,7 +116,7 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module {
 
         byteCnt := byteCnt + 1.U 
 
-        when (byteCnt === 3.U) {
+        when(byteCnt === 3.U) {
           stateReg := toCore
         }.otherwise {
           stateReg := receiveW
@@ -133,9 +126,9 @@ class OffChipCom(frequency: Int, baudRate: Int) extends Module {
     is(toCore) {
       // Transfer the received word to one of the input cores
       when(addr1 === 0.U) {
-        inC0V := true.B
+        io.inC0We := true.B
       }.otherwise {
-        inC1V := true.B
+        io.inC1We := true.B
       }
       pixCnt := pixCnt + 1.U
       

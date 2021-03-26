@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
 
-class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
+class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
   val io = IO(new Bundle {
     val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
     val wr        = Input(Bool()) //false: read, true: write
@@ -36,58 +36,4 @@ class EvaluationMemory2(val coreID: Int, val evalID: Int) extends Module {
     }
   }
   io.readData := memRead
-}
-
-object OneMem extends App {
-  chisel3.Driver.execute(Array("--target-dir", "build/"), () => new EvaluationMemory2(2,0))
-}
-
-@deprecated("this memory should not be used")
-class EvaluationMemory(coreID: Int, evalID: Int) extends Module {
-  val io = IO(new Bundle {
-    val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
-    val wr        = Input(Bool()) //false: read, true: write
-    val ena       = Input(Bool())
-    val readData  = Output(SInt(NEUDATAWIDTH.W))
-    val writeData = Input(SInt(NEUDATAWIDTH.W))
-  })
-
-  val refracPotMem     = SyncReadMem(2 * TMNEURONS, SInt(NEUDATAWIDTH.W))
-  val memRead          = Wire(SInt(NEUDATAWIDTH.W))
-  val syncOut          = RegInit(false.B)
-
-  
-  //Hardcoded mapping for showcase network
-  val pROM = Module(new PROM(coreID, evalID))
-  //val romRead = RegInit(0.S(NEUDATAWIDTH.W))
-  val romRead = Wire(SInt(NEUDATAWIDTH.W))
-  val romEna = Wire(Bool())
-
-
-  //default assignment 
-  memRead := DontCare
-  syncOut := false.B
-  romEna := false.B
-
-  pROM.io.ena := romEna
-  pROM.io.addr := io.addr
-  romRead := pROM.io.data
-  when(io.ena) {
-    when(io.addr < (2 * TMNEURONS).U) {
-      val rdwrPort = refracPotMem(io.addr)
-      when(io.wr) {
-        rdwrPort := io.writeData
-      }.otherwise {
-        syncOut := true.B
-        memRead := rdwrPort
-      }
-    }.otherwise{
-      romEna := true.B
-    }
-  }
-
-  io.readData := romRead
-  when(syncOut) {
-    io.readData := memRead
-  }
 }
