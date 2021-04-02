@@ -2,7 +2,8 @@ package neuroproc
 
 import chisel3._
 import chisel3.util._
-import chisel3.util.experimental.loadMemoryFromFile
+import chisel3.util.experimental.loadMemoryFromFileInline
+import firrtl.annotations.MemoryLoadFileType
 
 class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
   val io = IO(new Bundle {
@@ -19,7 +20,11 @@ class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
   val memRead          = Wire(SInt(NEUDATAWIDTH.W))
 
   // Hardcoded mapping for showcase network - simulation only!
-  loadMemoryFromFile(eMem, "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem")
+  loadMemoryFromFileInline( // chisel3 3.5-SNAPSHOT needed for inline version
+    eMem, 
+    "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem",
+    MemoryLoadFileType.Binary
+  )
 
   // Default assignment
   memRead := DontCare

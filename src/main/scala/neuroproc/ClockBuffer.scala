@@ -18,16 +18,16 @@ abstract class ClockBuffer extends Module {
 // seen in "How to Successfully Use Gated Clocking in an ASIC Design" by
 // Darren Jones of MIPS Technologies.
 class BUFGCE extends BlackBox {
-  val io = IO(new ClockBufferIO)
+  val io_ = IO(new ClockBufferIO).suggestName("io") // chisel3 3.5-SNAPSHOT bug
 }
 
 class ClockBufferFPGA extends ClockBuffer {
   val bg = Module(new BUFGCE)
-  io <> bg.io
+  io <> bg.io_
 }
 
-class ClockBufferBB extends BlackBox with HasBlackBoxInline {
-  val io = IO(new ClockBufferIO)
+class ClockBufferBB() extends BlackBox with HasBlackBoxInline {
+  val io_ = IO(new ClockBufferIO).suggestName("io") // chisel3 3.5-SNAPSHOT bug
   setInline("ClockBufferBB.v",
   s"""
   |module ClockBufferBB(i, ce, o);
@@ -49,7 +49,7 @@ class ClockBufferBB extends BlackBox with HasBlackBoxInline {
 
 class ClockBufferVerilog extends ClockBuffer {
   val bb = Module(new ClockBufferBB)
-  io <> bb.io
+  io <> bb.io_
 }
 
 object ClockBuffer {

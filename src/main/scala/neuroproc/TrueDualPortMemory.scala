@@ -29,7 +29,7 @@ abstract class TrueDualPortMemory(addrW: Int, dataW: Int) extends Module {
 }
 
 class TrueDualPortMemoryBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackBoxInline {
-  val io = IO(new TrueDualPortMemoryIO(addrW, dataW))
+  val io_ = IO(new TrueDualPortMemoryIO(addrW, dataW)).suggestName("io") // chisel3 3.5-SNAPSHOT bug
   setInline("TrueDualPortMemoryBB.v",
   s"""
   |module TrueDualPortMemoryBB(clka, ena, wea, addra, dia, doa,
@@ -69,7 +69,7 @@ class TrueDualPortMemoryBB(addrW: Int, dataW: Int) extends BlackBox with HasBlac
 
 class TrueDualPortMemoryVerilog(addrW: Int, dataW: Int) extends TrueDualPortMemory(addrW, dataW) {
   val mem = Module(new TrueDualPortMemoryBB(addrW, dataW))
-  io <> mem.io
+  io <> mem.io_
 }
 
 class TrueDualPortMemoryChisel(addrW: Int, dataW: Int) extends TrueDualPortMemory(addrW, dataW) {

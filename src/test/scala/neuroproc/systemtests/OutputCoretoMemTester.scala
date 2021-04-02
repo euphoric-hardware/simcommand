@@ -2,13 +2,14 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 
-class OutputCoretoMemTester extends FlatSpec with ChiselScalatestTester with Matchers {
+class OutputCoretoMemTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Output core to memory"
 
   it should "work with FIFO queue" in {

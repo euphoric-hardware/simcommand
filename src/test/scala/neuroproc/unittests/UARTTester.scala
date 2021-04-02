@@ -2,7 +2,8 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
@@ -10,7 +11,7 @@ import chiseltest.internal.WriteVcdAnnotation
 
 // Inspired by https://github.com/schoeberl/chisel-examples/blob/master/src/test/scala/uart/UartTester.scala
 
-class RxTester extends FlatSpec with ChiselScalatestTester with Matchers {
+class RxTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "UART Rx"
 
   val bitDelay = FREQ / BAUDRATE + 1
@@ -51,7 +52,7 @@ class RxTester extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 }
 
-class TxTester extends FlatSpec with ChiselScalatestTester with Matchers {
+class TxTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "UART Tx"
 
   val bitDelay = FREQ / BAUDRATE + 1
@@ -91,7 +92,7 @@ class TxTester extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 }
 
-class UartEchoTester extends FlatSpec with ChiselScalatestTester with Matchers {
+class UartEchoTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "UART Echo"
 
   val bitDelay = FREQ / BAUDRATE + 1

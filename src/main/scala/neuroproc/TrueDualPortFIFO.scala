@@ -24,7 +24,7 @@ abstract class TrueDualPortFIFO(addrW: Int, dataW: Int) extends Module {
 }
 
 class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackBoxInline {
-  val io = IO(new TrueDualPortFIFOIO(addrW, dataW))
+  val io_ = IO(new TrueDualPortFIFOIO(addrW, dataW)).suggestName("io") // chisel3 3.5-SNAPSHOT bug
   val numElements = ((1 << addrW) - 1)
   setInline("TrueDualPortFIFOBB.v",
   s"""
@@ -34,7 +34,7 @@ class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackB
   |input clki, we, clko, en, reset;
   |input  [${dataW-1}:0] datai;
   |output full, empty;
-  |output [${dataW-1}:0] datao;
+  |output reg [${dataW-1}:0] datao;
   |reg    [${dataW-1}:0] ram [${((1 << addrW) - 1)}:0];
   |wire   [${addrW-1}:0] wAddrNext, rAddrNext;
   |reg    [${addrW-1}:0] wAddr, rAddr;
@@ -43,14 +43,11 @@ class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackB
   |initial fullReg  = 1'b0;
   |
   |// Combinational logic
-  |always @*
-  |begin
-  |  wAddrNext = wAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : wAddr + 1;
-  |  rAddrNext = rAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : rAddr + 1;
+  |assign wAddrNext = wAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : wAddr + 1;
+  |assign rAddrNext = rAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : rAddr + 1;
   |
-  |  full  = fullReg;
-  |  empty = emptyReg;
-  |end
+  |assign full  = fullReg;
+  |assign empty = emptyReg;
   |
   |// Write port
   |always @(posedge clki)
@@ -100,7 +97,7 @@ class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackB
 
 class TrueDualPortFIFOVerilog(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {
   val fifo = Module(new TrueDualPortFIFOBB(addrW, dataW))
-  io <> fifo.io
+  io <> fifo.io_
 }
 
 class TrueDualPortFIFOChisel(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {

@@ -8,8 +8,8 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "edu.berkeley.cs" %% "chisel3" % "3.4.2",
-  "edu.berkeley.cs" %% "chiseltest" % "0.3.2",
-  "org.scalatest" %% "scalatest" % "3.0.8",
+  "edu.berkeley.cs" %% "chisel3" % "3.5-SNAPSHOT",
+  "edu.berkeley.cs" %% "chiseltest" % "0.5-SNAPSHOT",
+  "org.scalatest" %% "scalatest" % "3.2.6",
   "io.spray" %%  "spray-json" % "1.3.5"
 )
