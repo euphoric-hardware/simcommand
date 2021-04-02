@@ -15,10 +15,11 @@ The folder structure may be cleaned by
 
 Accelerator parameters are listed in _src/main/scala/neuroproc/package.scala_ and per default target a Xilinx Kintex-7 FPGA with [BUFGCE](https://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf) primitives inserted instead of the typical latch-based clock-gating cells used in ASICs.
 
-## Install guide (Tested only with Ubuntu 18.04 and 19.04):
+## Install guide (tested with Ubuntu 20.04)
 The accelerator is written in [Chisel3](https://github.com/chipsalliance/chisel3) and tests are run using [ChiselTest](https://github.com/ucb-bar/chisel-testers2) with either the built-in [Treadle](https://github.com/chipsalliance/treadle) backend, the [Verilator](https://github.com/verilator/verilator) backend, or the Synopsys VCS backend. VCS is only used for the clock-gating tests which require support for derived clocks. These tests will be skipped if VCS is not available.
 
 ### Java 8
+Java 8 is preferred for Chisel3 thus far, although the code runs with Java 11 as well.
 
     $sudo apt update
     $sudo apt install openjdk-8-jdk openjdk-8-jre

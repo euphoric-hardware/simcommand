@@ -2,17 +2,7 @@
 SBT := sbt
 
 .PHONY : all
-all : install proc
-
-install :
-	git clone https://github.com/chipsalliance/chisel3.git
-	cd chisel3
-	$(SBT) publishLocal
-	cd ..
-	git clone https://github.com/ucb-bar/chisel-testers2.git
-	cd chisel-testers2
-	$(SBT) publishLocal
-	cd ..
+all : proc
 
 proc :
 	$(SBT) "runMain neuroproc.MakeDataFiles"
