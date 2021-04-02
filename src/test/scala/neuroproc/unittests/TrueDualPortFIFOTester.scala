@@ -3,14 +3,13 @@ package neuroproc.unittests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 
-class TrueDualPortFIFOTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class TrueDualPortFIFOTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "True dual port FIFO"
 
   val numElements = 8

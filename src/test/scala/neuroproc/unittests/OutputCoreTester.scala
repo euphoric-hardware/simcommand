@@ -3,14 +3,13 @@ package neuroproc.unittests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 
-class OutputCoreTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class OutputCoreTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "Output Core"
 
   it should "accept and transfer spikes" in {

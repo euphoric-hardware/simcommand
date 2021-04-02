@@ -2,6 +2,7 @@
 .bloop*
 .bsp*
 .vscode*
+.idea*
 project/*
 target/*
 *.hex

@@ -3,14 +3,13 @@ package neuroproc.systemtests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.VcsBackendAnnotation
 
-class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "Derived clock system"
 
   it should "work with multiple clocks" taggedAs(VcsTest, SlowTest) in {

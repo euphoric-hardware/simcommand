@@ -3,13 +3,12 @@ package neuroproc.unittests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 
-class BusArbiterTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class BusArbiterTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "Bus Arbiter"
 
   it should "handle requests" in {

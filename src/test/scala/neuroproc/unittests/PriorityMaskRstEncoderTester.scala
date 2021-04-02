@@ -3,13 +3,12 @@ package neuroproc.unittests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 
-class PriorityMaskRstEncoderTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class PriorityMaskRstEncoderTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "Priority Mask Reset Encoder"
 
   it should "handle requests" in {

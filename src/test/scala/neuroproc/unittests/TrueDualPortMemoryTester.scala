@@ -3,13 +3,12 @@ package neuroproc.unittests
 import neuroproc._
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{WriteVcdAnnotation, VerilatorBackendAnnotation}
 
-class TrueDualPortMemoryTester extends AnyFlatSpec with ChiselScalatestTester with Matchers {
+class TrueDualPortMemoryTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "True dual port memory"
 
   val addrW = 10
