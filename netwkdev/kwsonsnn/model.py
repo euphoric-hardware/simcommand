@@ -26,7 +26,7 @@ class ShowCaseNet(Network):
         nu: Optional[Union[float, Sequence[float]]] = (1e-4, 1e-2),
         reduction: Optional[callable] = None,
         wmin: float = 0.0,
-        wmax: float = 1000.0,
+        wmax: float = 1.0, #*1000
         norm: float = 78.4*1000,
         theta_plus: float = 0.05*1000,
         tc_theta_decay: float = 1e7,
@@ -73,7 +73,7 @@ class ShowCaseNet(Network):
             traces=True,
             rest=0.0,
             reset=5.0,
-            thresh=12.0*1000,
+            thresh=12.0, #*1000
             refrac=5,
             tc_decay=100.0,
             tc_trace=20.0,
@@ -85,14 +85,14 @@ class ShowCaseNet(Network):
             traces=False,
             rest=0.0,
             reset=15.0,
-            thresh=20.0*1000,
+            thresh=20.0, #*1000
             tc_decay=10.0,
             refrac=2,
             tc_trace=20.0,
         )
 
         # Connections
-        w = 0.3*1000 * torch.rand(self.n_inpt, self.n_neurons)
+        w = 0.3 * torch.rand(self.n_inpt, self.n_neurons) #*1000
         input_exc_conn = Connection(
             source=input_layer,
             target=exc_layer,

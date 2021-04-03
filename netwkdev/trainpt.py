@@ -43,29 +43,23 @@ if use_mnist:
 ###############################################################################
 # Network and GPU-related setup
 print('Setting up network')
-
+cuda_avail = torch.cuda.is_available()
 class ShowCaseNetPT(nn.Module):
     def __init__(self):
         super(ShowCaseNetPT, self).__init__()
 
         # Build a very simple model with two layers
-        self.ff1 = nn.Linear(
-            in_features=22*22,
-            out_features=200
-        )
-        self.ff2 = nn.Linear(
-            in_features=200,
-            out_features=200
-        )
+        self.ff1 = nn.Linear(in_features=484, out_features=200)
+        self.ff2 = nn.Linear(in_features=200, out_features=200)
 
     def forward(self, X):
         return F.softmax(self.ff2(F.relu(self.ff1(X.view(-1)))), dim=0)
 
 network = ShowCaseNetPT()
-device = torch.device(f'cuda' if gpu and torch.cuda.is_available() else 'cpu')
+device = torch.device(f'cuda' if gpu and cuda_avail else 'cpu')
 print(f'Using device = {str(device)}')
 network = network.to(device)
-if gpu and torch.cuda.is_available():
+if gpu and cuda_avail:
     torch.cuda.manual_seed(seed)
 else:
     torch.manual_seed(seed)
@@ -80,7 +74,9 @@ train_data = MNIST(
     transform=transforms.Compose(
         [transforms.Resize(size=(22,22)), transforms.ToTensor()]
     )
-) if use_mnist else SpeechCommandsDataset(data_path, download=True, kws=kws)
+) if use_mnist else SpeechCommandsDataset(
+    data_path, download=True, kws=kws
+)
 valid_data = MNIST(
     os.path.join(".", "mnist"), 
     download=False,
@@ -88,18 +84,22 @@ valid_data = MNIST(
         [transforms.Resize(size=(22,22)), transforms.ToTensor()]
     ),
     train=False
-) if use_mnist else SpeechCommandsDataset(data_path, download=False, split='valid', kws=kws)
-test_data = None if use_mnist else SpeechCommandsDataset(data_path, download=False, split='test', kws=kws)
+) if use_mnist else SpeechCommandsDataset(
+    data_path, download=False, split='valid', kws=kws
+)
+test_data = None if use_mnist else SpeechCommandsDataset(
+    data_path, download=False, split='test', kws=kws
+)
 
 # Wrap in dataloaders
 train_loader = torch.utils.data.DataLoader(
-    train_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    train_data, batch_size=1, pin_memory=gpu and cuda_avail, shuffle=True
 )
 valid_loader = torch.utils.data.DataLoader(
-    valid_data, batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    valid_data, batch_size=1, pin_memory=gpu and cuda_avail, shuffle=True
 )
 test_loader  = None if use_mnist else torch.utils.data.DataLoader(
-    test_data,  batch_size=1, pin_memory=gpu and torch.cuda.is_available(), shuffle=True
+    test_data,  batch_size=1, pin_memory=gpu and cuda_avail, shuffle=True
 )
 n_train = n_train if n_train != -1 else len(train_loader.dataset)
 n_valid = n_valid if n_valid != -1 else len(valid_loader.dataset)
@@ -148,8 +148,12 @@ try:
             if i >= n_train:
                 break
             optimizer.zero_grad()
-            inputs = datum[0] if use_mnist else datum['audio'].to(device)
-            target = datum[1] if use_mnist else torch.Tensor([datum['label']]).to(device)
+            if use_mnist:
+                inputs = datum[0]
+                target = datum[1]
+            else:
+                inputs = datum['audio'].to(device)
+                target = torch.Tensor([datum['label']]).to(device)
             output = network(inputs)
             loss = criterion(output, target)
             loss.backward()
@@ -158,27 +162,45 @@ try:
 
             if target.long().item() == get_pred(output).long().item():
                 hit += 1
-        print(f'\ttraining loss: {epoch_training_loss / n_train}, accuracy: {hit / n_train}')
+        print('\ttraining loss: {:.5f}, accuracy: {:.2f}%'.format(
+            epoch_training_loss / n_train, (hit / n_train) * 100
+        ))
 
         # Validation
         network.eval()
         epoch_validation_loss = 0
         hit = 0
-        confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
+        if use_mnist:
+            confusion = DataFrame([[0] * n_classes for _ in range(n_classes)])
+        else:    
+            confusion = DataFrame([[0] * n_classes for _ in range(n_classes)], 
+                columns=kws, index=kws
+            )
         with torch.no_grad():
             for (i, datum) in tqdm(enumerate(valid_loader)):
                 if i >= n_valid:
                     break
-                inputs = datum[0] if use_mnist else datum['audio'].to(device)
-                target = datum[1] if use_mnist else torch.Tensor([datum['label']]).to(device)
+                if use_mnist:
+                    inputs = datum[0]
+                    target = datum[1]
+                else:
+                    inputs = datum['audio'].to(device)
+                    target = torch.Tensor([datum['label']]).to(device)
                 output = network(inputs)
                 loss = criterion(output, target)
                 epoch_validation_loss += loss.item()
 
-                confusion[target.long().item()][get_pred(output).long().item()] += 1
-                if target.long().item() == get_pred(output).long().item():
+                true_idx = target.long().item()
+                pred_idx = get_pred(output).long().item()
+                if use_mnist:
+                    confusion[true_idx][pred_idx] += 1
+                else:
+                    confusion[kws[true_idx]][kws[pred_idx]] += 1
+                if true_idx == pred_idx:
                     hit += 1
-        print(f'\tvalidation loss: {epoch_validation_loss / n_valid}, accuracy: {hit / n_valid}')
+        print('\tvalidation loss: {:.5f}, accuracy: {:.2f}%'.format(
+            epoch_validation_loss / n_valid, (hit / n_valid) * 100
+        ))
         print('Confusion matrix:')
         print(confusion)
 
@@ -191,15 +213,22 @@ try:
     test_loss = 0
     with torch.no_grad():
         for (i, datum) in tqdm(enumerate(test_loader)):
-            inputs = datum[0] if use_mnist else datum['audio'].to(device)
-            target = datum[1] if use_mnist else torch.Tensor([datum['label']]).to(device)
+            if use_mnist:
+                inputs = datum[0]
+                target = datum[1]
+            else:
+                inputs = datum['audio'].to(device)
+                target = torch.Tensor([datum['label']]).to(device)
             output = network(inputs)
             loss = criterion(output, target)
             test_loss += loss.item()
 
             if target.long().item() == get_pred(output).long().item():
                 hit += 1
-    print(f'\ttest loss: {test_loss / len(test_loader.dataset)}, accuracy: {hit / len(test_loader.dataset)}')
+    print('\ttest loss: {:.5f}, accuracy: {:.2f}%'.format(
+        test_loss / len(test_loader.dataset), 
+        (hit / len(test_loader.dataset)) * 100
+    ))
 
 except KeyboardInterrupt:
     print('Keyboard interrupt caught.')
