@@ -12,16 +12,16 @@ class NeuromorphicProcessor(synth: Boolean = false) extends Module {
   // Global clock gating
   val topClock = Wire(Clock())
   val cBufTop  = Module(ClockBuffer(synth)) // for clock tree balance
-  cBufTop.io.ce := true.B
-  cBufTop.io.i  := clock
-  topClock := cBufTop.io.o
+  cBufTop.io.CE := true.B
+  cBufTop.io.I  := clock
+  topClock := cBufTop.io.O
 
   val coreClock = Wire(Clock())
   val cBufCore  = Module(ClockBuffer(synth))
   val clkEn = Wire(Bool())
-  cBufCore.io.ce := clkEn
-  cBufCore.io.i  := clock
-  coreClock := cBufCore.io.o
+  cBufCore.io.CE := clkEn
+  cBufCore.io.I  := clock
+  coreClock := cBufCore.io.O
 
   // Relevant true dual port memories
   val inC0Mem = Module(TrueDualPortMemory(RATEADDRWIDTH+1, RATEWIDTH, synth))

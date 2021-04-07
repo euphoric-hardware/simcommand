@@ -19,18 +19,18 @@ class ClockBufferTester extends AnyFlatSpec with ChiselScalatestTester {
     test(ClockBuffer())
       .withAnnotations(Seq(VcsBackendAnnotation, WriteVcdAnnotation)) {
       dut =>
-        dut.io.i.high()
-        dut.io.ce.poke(true.B)
-        assert(dut.io.o.peekClock, "expected high output clock when i=true and ce=true")
+        dut.io.I.high()
+        dut.io.CE.poke(true.B)
+        assert(dut.io.O.peekClock, "expected high output clock when i=true and ce=true")
         dut.clock.step()
-        dut.io.i.low()
-        assert(!dut.io.o.peekClock, "expected low output clock when i=false and ce=true")
+        dut.io.I.low()
+        assert(!dut.io.O.peekClock, "expected low output clock when i=false and ce=true")
         dut.clock.step()
-        dut.io.ce.poke(false.B)
-        assert(!dut.io.o.peekClock, "expected low output clock when i=false and ce=false")
+        dut.io.CE.poke(false.B)
+        assert(!dut.io.O.peekClock, "expected low output clock when i=false and ce=false")
         dut.clock.step()
-        dut.io.i.high()
-        assert(!dut.io.o.peekClock, "expected low output clock when i=true and ce=false")
+        dut.io.I.high()
+        assert(!dut.io.O.peekClock, "expected low output clock when i=true and ce=false")
         dut.clock.step()
     }
   }

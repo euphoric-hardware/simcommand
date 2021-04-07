@@ -23,8 +23,11 @@ abstract class TrueDualPortFIFO(addrW: Int, dataW: Int) extends Module {
   val io = IO(new TrueDualPortFIFOIO(addrW, dataW))
 }
 
-class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackBoxInline {
-  val io = IO(new TrueDualPortFIFOIO(addrW, dataW))
+class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends HasBlackBoxInline {
+  private[TrueDualPortFIFOBB] class FIFOBBIO extends TrueDualPortFIFOIO(addrW, dataW) {
+    val reset = Input(Reset())
+  }
+  val io = IO(new FIFOBBIO)
   val numElements = ((1 << addrW) - 1)
   setInline("TrueDualPortFIFOBB.v",
   s"""
@@ -97,7 +100,17 @@ class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends BlackBox with HasBlackB
 
 class TrueDualPortFIFOVerilog(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {
   val fifo = Module(new TrueDualPortFIFOBB(addrW, dataW))
-  io <> fifo.io
+  fifo.io.clki  := io.clki
+  fifo.io.we    := io.we
+  fifo.io.datai := io.datai
+  io.full := fifo.io.full
+
+  fifo.io.clko  := io.clko
+  fifo.io.en    := io.en
+  io.datao := fifo.io.datao
+  io.empty := fifo.io.empty
+
+  fifo.io.reset := reset
 }
 
 class TrueDualPortFIFOChisel(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {

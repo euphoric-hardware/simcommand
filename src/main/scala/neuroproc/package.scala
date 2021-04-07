@@ -140,7 +140,7 @@ package object neuroproc {
     var cores = Map.empty[Int, Array[Array[Int]]]
   
     def getFilter(coreID: Int): Vector[Int] = {
-      val source = scala.io.Source.fromFile("mapping/interfaceLut484c2.json")
+      val source = scala.io.Source.fromFile("mapping/interfaceLut484.json")
       val lines = try source.mkString finally source.close()
       val paramJson = lines.parseJson
   
@@ -194,7 +194,7 @@ package object neuroproc {
         val potentialSet = params.getMemData("reset", i, j)
       
         val filedata = potNrefrac ++ weights ++ biases ++ decays ++ thresholds ++ refracSets ++ potentialSet
-        val file = new PrintWriter(new File("mapping/evaldata"+"c"+i.toString+"e"+j.toString+".mem"))
+        val file = new PrintWriter(new File("mapping/meminit/evaldata"+"c"+i.toString+"e"+j.toString+".mem"))
         // Could be made fully functional like:
         // file.write(filedata.map(toHex(_, 17)).mkString("\n"))
         for (d <- filedata) {

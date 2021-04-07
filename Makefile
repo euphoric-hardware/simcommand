@@ -2,11 +2,14 @@
 SBT := sbt
 
 .PHONY : all
-all : proc
+all : proc vivado
 
 proc :
 	$(SBT) "runMain neuroproc.MakeDataFiles"
 	$(SBT) "runMain neuroproc.NeuromorphicProcessor"
+
+vivado :
+	./mapping/gentcl.sh
 
 .PHONY : clean
 clean :

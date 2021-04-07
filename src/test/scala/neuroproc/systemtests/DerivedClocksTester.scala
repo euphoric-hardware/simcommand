@@ -21,17 +21,17 @@ class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester {
       // First clock
       val clock1 = Wire(Clock())
       val buf1   = Module(ClockBuffer())
-      buf1.io.ce := true.B
-      buf1.io.i  := clock
-      clock1 := buf1.io.o
+      buf1.io.CE := true.B
+      buf1.io.I  := clock
+      clock1 := buf1.io.O
 
       // Second clock
       val en2    = WireDefault(true.B)
       val clock2 = Wire(Clock())
       val buf2   = Module(ClockBuffer())
-      buf2.io.ce := en2
-      buf2.io.i  := clock
-      clock2 := buf2.io.o
+      buf2.io.CE := en2
+      buf2.io.I  := clock
+      clock2 := buf2.io.O
 
       // A test memory
       val mem = Module(TrueDualPortFIFO(16, 8))

@@ -4,9 +4,9 @@ import chisel3._
 import chisel3.util._
 
 class ClockBufferIO extends Bundle {
-  val i  = Input(Clock())
-  val ce = Input(Bool())
-  val o  = Output(Clock())
+  val I  = Input(Clock())
+  val CE = Input(Bool())
+  val O  = Output(Clock())
 }
 
 abstract class ClockBuffer extends Module {
@@ -17,7 +17,7 @@ abstract class ClockBuffer extends Module {
 // implemented much more involved along the lines of `ClockBufferBB`, as
 // seen in "How to Successfully Use Gated Clocking in an ASIC Design" by
 // Darren Jones of MIPS Technologies.
-class BUFGCE extends BlackBox {
+class BUFGCE extends BlackBox(Map("SIM_DEVICE" -> "7SERIES")) {
   val io = IO(new ClockBufferIO)
 }
 
@@ -26,22 +26,22 @@ class ClockBufferFPGA extends ClockBuffer {
   io <> bg.io
 }
 
-class ClockBufferBB() extends BlackBox with HasBlackBoxInline {
+class ClockBufferBB extends BlackBox with HasBlackBoxInline {
   val io = IO(new ClockBufferIO)
   setInline("ClockBufferBB.v",
   s"""
-  |module ClockBufferBB(i, ce, o);
-  |input  i, ce;
-  |output o;
+  |module ClockBufferBB(I, CE, O);
+  |input  I, CE;
+  |output O;
   |reg gate;
   |
-  |always @(i or ce)
+  |always @(I or CE)
   |begin
-  |  if (~i)
-  |    gate <= ce; 
+  |  if (~I)
+  |    gate <= CE; 
   |end
   |
-  |assign o = gate & i;
+  |assign O = gate & I;
   |
   |endmodule
   """.stripMargin)
