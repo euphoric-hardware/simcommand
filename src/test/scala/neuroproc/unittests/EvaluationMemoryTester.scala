@@ -23,7 +23,8 @@ class EvaluationMemoryTester extends AnyFlatSpec with ChiselScalatestTester {
         // Read a few random addresses
         val rng = new scala.util.Random(42)
         val indexes = Array.fill(128) { rng.nextInt(EVALMEMSIZE) }.sorted
-        val lines = scala.io.Source.fromFile("mapping/evaldatac2e0.mem").getLines.map { Integer.parseInt(_, 2) }
+        val lines = scala.io.Source.fromFile("mapping/meminit/evaldatac2e0.mem")
+          .getLines.map { Integer.parseInt(_, 2) }
         var count = 0
         for (elem <- lines) {
           if (count < indexes.length && count == indexes(count)) {

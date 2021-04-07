@@ -22,7 +22,7 @@ class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
   // Hardcoded mapping for showcase network - simulation only!
   loadMemoryFromFileInline( // chisel3 3.5-SNAPSHOT needed for inline version
     eMem, 
-    "mapping/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem",
+    "mapping/meminit/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem",
     MemoryLoadFileType.Binary
   )
 

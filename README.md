@@ -1,5 +1,5 @@
 # NeuromorphicProcessor
-[![Actions Status](https://github.com/hansemandse/KWSonSNN/workflows/ci.yml/badge.svg)](https://github.com/hansemandse/KWSonSNN/actions)
+[![Actions Status](https://github.com/hansemandse/KWSonSNN/actions/workflows/ci.yml/badge.svg)](https://github.com/hansemandse/KWSonSNN/actions)
 Neuromorphic processor implementation for Master thesis - WIP!
 
 The accelerator may be built by
