@@ -27,7 +27,7 @@ parser.add_argument('--n_clamp', type=int, default=1)
 parser.add_argument('--n_train', type=int, default=-1)
 parser.add_argument('--n_valid', type=int, default=-1)
 parser.add_argument('--exc', type=float, default=22.5)
-parser.add_argument('--inh', type=float, default=22.5)
+parser.add_argument('--inh', type=float, default=17.5)
 parser.add_argument('--time', type=int, default=500)
 parser.add_argument('--dt', type=int, default=1.0)
 parser.add_argument('--intensity', type=float, default=128.0)
@@ -77,13 +77,13 @@ cuda_avail = torch.cuda.is_available()
 network = ShowCaseNet(
     n_inpt=22*22,
     n_neurons=n_neurons,
-    exc=exc, #*1000
-    inh=inh, #*1000
+    exc=exc,
+    inh=inh,
     dt=dt,
-    norm=78.4 if use_mnist else 78.4*3, #*1000,
-    nu=[1e-5, 2e-3],
+    norm=48.4 if use_mnist else 2*48.4,
+    nu=[1e-10, 1e-3] if use_mnist else [1e-5, 2e-3],
     inpt_shape=(1, 22, 22),
-    theta_plus=0.05 #*1000
+    theta_plus=0.05
 )
 device = torch.device(f'cuda' if gpu and cuda_avail else 'cpu')
 print(f'Using device = {str(device)}')
@@ -200,9 +200,10 @@ try:
                 image = datum['encoded_image']
                 label = datum['label']
             else:
-                image = audio_enc(datum['audio'] * intensity).to(device)
+                image = audio_enc(datum['audio'] * intensity)
                 image = image.view(1, *image.shape)
-                label = label_enc(datum['label']).to(device)
+                label = label_enc(datum['label'])
+            image, label = image.to(device), label.to(device)
 
             if i % update_interval == 0 and i > 0:
                 # Get a tensor of labels
@@ -300,31 +301,31 @@ try:
                             'Ai': inh_v_monitor.get('v')}
 
                 # Plot labelled input
-                #inpt_axes, inpt_ims = plot_input(
-                #    image.sum(1).view(22, 22),
-                #    inpt,
-                #    label=label,
-                #    axes=inpt_axes,
-                #    ims=inpt_ims,
-                #)
+                inpt_axes, inpt_ims = plot_input(
+                    image.sum(1).view(22, 22),
+                    inpt,
+                    label=label,
+                    axes=inpt_axes,
+                    ims=inpt_ims,
+                )
                 
                 # Plot the spikes from each layer
-                #spike_ims, spike_axes = plot_spikes(
-                #    {l: spikes[l].get('s').view(time, 1, -1) for l in spikes}, 
-                #    ims=spike_ims, 
-                #    axes=spike_axes,
-                #)
+                spike_ims, spike_axes = plot_spikes(
+                    {l: spikes[l].get('s').view(time, 1, -1) for l in spikes}, 
+                    ims=spike_ims, 
+                    axes=spike_axes,
+                )
 
                 # Plot the weights, assignments, and performance
                 weights_im = plot_weights(square_weights, im=weights_im)
-                #assigns_im = plot_assignments(
-                #    square_assignments, im=assigns_im, classes=kws
-                #)
+                assigns_im = plot_assignments(
+                    square_assignments, im=assigns_im, classes=kws
+                )
 
                 # Plot the node voltages
-                #voltage_ims, voltage_axes = plot_voltages(
-                #    voltages, ims=voltage_ims, axes=voltage_axes
-                #)
+                voltage_ims, voltage_axes = plot_voltages(
+                    voltages, ims=voltage_ims, axes=voltage_axes
+                )
 
                 # Pause to allow plots to appear. Should be adjusted to the
                 # particular system the script is running on.
@@ -353,9 +354,10 @@ try:
                 image = datum['encoded_image']
                 label = datum['label']
             else:
-                image = audio_enc(datum['audio'] * intensity).to(device)
+                image = audio_enc(datum['audio'] * intensity)
                 image = image.view(1, *image.shape)
-                label = label_enc(datum['label']).to(device)
+                label = label_enc(datum['label'])
+            image, label = image.to(device), label.to(device)
             inputs = {'X': image.view(time, 1, 1, 22, 22)}
             # Run the network on the input
             network.run(inputs=inputs, time=time)

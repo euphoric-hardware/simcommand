@@ -448,7 +448,10 @@ class SpeechCommandsDataset(torch.utils.data.Dataset):
             filter_banks = 20 * np.log10(filter_banks)
             # Fix negative dB numbers after normalization
             filter_banks += np.abs(np.min(filter_banks))
-            # Normalize the signal
+            # Filter out everything below the 80th percentile and normalize
+            filter_banks = np.where(
+                filter_banks >= np.percentile(filter_banks, 80), filter_banks, 0
+            )
             filter_banks /= np.max(filter_banks)
             
             # Append the signal and its label to the lists

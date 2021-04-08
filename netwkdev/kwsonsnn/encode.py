@@ -29,10 +29,10 @@ def rate(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> torch.Ten
 
     # Compute firing rates in seconds as function of data intensity,
     # accounting for simulation time step.
-    rate = torch.zeros(size)
+    rate = torch.zeros(size, device=datum.device)
     rate[datum != 0] = 1 / datum[datum != 0] * (1000 / dt)
     
-    timeRates = torch.ones(time+1, size)
+    timeRates = torch.ones(time+1, size, device=datum.device)
     for i in range(time+1):
         timeRates[i] = rate
         
@@ -73,7 +73,7 @@ def ratePeriod(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> tor
 
     # Compute firing rates in seconds as function of data intensity,
     # accounting for simulation time step.
-    rate = torch.zeros(size)
+    rate = torch.zeros(size, device=datum.device)
     rate[datum != 0] = 1 / datum[datum != 0] * (1000 / dt)
     
     return torch.clamp(rate.round(), min=0, max=time).long()
