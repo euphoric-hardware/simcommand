@@ -176,12 +176,14 @@ class TrueDualPortMemoryTester extends AnyFlatSpec with ChiselScalatestTester {
     portBr.join
   }
 
-  it should "work in both Chisel and Verilog" in {
+  it should "work in Verilog" in {
     test(TrueDualPortMemory(addrW, dataW, true))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => testFn(dut)
       }
-    
+  }
+
+  it should "work in Chisel" in {
     test(TrueDualPortMemory(addrW, dataW, false))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => testFn(dut)

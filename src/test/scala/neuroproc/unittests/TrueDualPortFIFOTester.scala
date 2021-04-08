@@ -79,12 +79,14 @@ class TrueDualPortFIFOTester extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.full.expect(false.B)
   }
 
-  it should "flag empty and full" in {
+  it should "flag empty and full in Verilog" in {
     test(TrueDualPortFIFO(numElements, dataW, true))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => flagTest(dut)
       }
-    
+  }
+
+  it should "flag empty and full in Chisel" in {
     test(TrueDualPortFIFO(numElements, dataW, false))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => flagTest(dut)
@@ -149,12 +151,14 @@ class TrueDualPortFIFOTester extends AnyFlatSpec with ChiselScalatestTester {
   // NOTE: only works with Verilator backend - likely a Treadle issue
   // related to reading out values from the synchronous memory. Its output
   // appears to be asynchronous.
-  it should "operate with random inputs" in {
+  it should "operate with random inputs in Verilog" in {
     test(TrueDualPortFIFO(numElements, dataW, true))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => randomTest(dut)
       }
-    
+  }
+
+  it should "operate with random inputs in Chisel" in {
     test(TrueDualPortFIFO(numElements, dataW, false))
       .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut => randomTest(dut)
