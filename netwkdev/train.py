@@ -13,7 +13,7 @@ from bindsnet.network.monitors import Monitor
 from bindsnet.evaluation import (
     all_activity, proportion_weighting, assign_labels
 )
-from bindsnet.encoding import NullEncoder
+from bindsnet.encoding import NullEncoder, PoissonEncoder
 
 ###############################################################################
 # Argument parsing                                                            #
@@ -98,7 +98,7 @@ print('Fetching the dataset')
 kws = ['up', 'down', 'left', 'right', 'on', 'off', 'yes', 'no', 'go', 'stop']
 data_path = './data'
 train_data = MNIST(
-    RateEncoder(time=time, dt=dt),
+    PoissonEncoder(time=time, dt=dt),
     None,
     root=os.path.join('.', 'mnist'),
     download=True,
@@ -139,7 +139,8 @@ test_loader  = None if use_mnist else DataLoader(
     test_data, batch_size=1, pin_memory=gpu and cuda_avail, shuffle=True
 )
 if not use_mnist:
-    audio_enc = RateEncoder(time=time, dt=dt)
+    train_enc = PoissonEncoder(time=time, dt=dt)
+    valid_enc = RateEncoder(time=time, dt=dt)
     label_enc = NullEncoder()
 n_train = n_train if n_train != -1 else len(train_loader.dataset)
 n_valid = n_valid if n_valid != -1 else len(valid_loader.dataset)
@@ -200,7 +201,7 @@ try:
                 image = datum['encoded_image']
                 label = datum['label']
             else:
-                image = audio_enc(datum['audio'] * intensity)
+                image = train_enc(datum['audio'] * intensity)
                 image = image.view(1, *image.shape)
                 label = label_enc(datum['label'])
             image, label = image.to(device), label.to(device)
@@ -354,7 +355,7 @@ try:
                 image = datum['encoded_image']
                 label = datum['label']
             else:
-                image = audio_enc(datum['audio'] * intensity)
+                image = valid_enc(datum['audio'] * intensity)
                 image = image.view(1, *image.shape)
                 label = label_enc(datum['label'])
             image, label = image.to(device), label.to(device)
@@ -407,7 +408,7 @@ try:
         columns=kws, index=kws
     )
     for datum in tqdm(test_loader):
-        image = audio_enc(datum['audio'] * intensity).to(device)
+        image = valid_enc(datum['audio'] * intensity).to(device)
         image = image.view(1, *image.shape)
         label = label_enc(datum['label']).to(device)
         inputs = {'X': image.view(time, 1, 1, 22, 22)}
