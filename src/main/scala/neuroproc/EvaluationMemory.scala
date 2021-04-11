@@ -5,7 +5,7 @@ import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFileInline
 import firrtl.annotations.MemoryLoadFileType
 
-class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
+class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false) extends Module {
   val io = IO(new Bundle {
     val addr      = Input(UInt(EVALMEMADDRWIDTH.W))
     val wr        = Input(Bool()) //false: read, true: write
@@ -20,10 +20,12 @@ class EvaluationMemory(val coreID: Int, val evalID: Int) extends Module {
   val memRead          = Wire(SInt(NEUDATAWIDTH.W))
 
   // Hardcoded mapping for showcase network - simulation only!
+  val file = if (synth)
+    s"evaldatac${coreID}e${evalID}.mem"
+  else
+    s"mapping/meminit/evaldatac${coreID}e${evalID}.mem"
   loadMemoryFromFileInline( // chisel3 3.5-SNAPSHOT needed for inline version
-    eMem, 
-    "mapping/meminit/evaldatac"+coreID.toString+"e"+ evalID.toString+".mem",
-    MemoryLoadFileType.Binary
+    eMem, file, MemoryLoadFileType.Binary
   )
 
   // Default assignment

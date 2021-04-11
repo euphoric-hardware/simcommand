@@ -2,7 +2,7 @@ package neuroproc
 
 import chisel3._
 
-class Neurons(coreID: Int) extends Module {
+class Neurons(coreID: Int, synth: Boolean = false) extends Module {
   val io = IO(new Bundle {
     val done     = Output(Bool())
     val newTS    = Input(Bool())
@@ -21,7 +21,7 @@ class Neurons(coreID: Int) extends Module {
 
   val controlUnit = Module(new ControlUnit(coreID))
   val evalUnits   = (0 until EVALUNITS).map(i => Module(new NeuronEvaluator))
-  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory(coreID, i)))
+  val evalMems    = (0 until EVALUNITS).map(i => Module(new EvaluationMemory(coreID, i, synth)))
 
   io.inOut                := controlUnit.io.inOut
   controlUnit.io.spikeCnt := io.spikeCnt

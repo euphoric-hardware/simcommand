@@ -6,9 +6,8 @@ output uartTx;
 wire clk;
 
 clk_wiz_0 clkGen(
-    .clk(clk),
+    .clk_out1(clk),
     .reset(reset),
-    .locked(),
     .clk_in1_p(sysclk_p),
     .clk_in1_n(sysclk_n)
 );

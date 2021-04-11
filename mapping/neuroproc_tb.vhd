@@ -9,32 +9,37 @@ entity neuroproc_tb is
 end neuroproc_tb;
 
 architecture rtl of neuroproc_tb is
-    constant T_clk : time := 12.5 ns;
-    constant FREQ     : natural := 80000000;
-    constant BAUDRATE : natural := 115200;
-    constant BITDELAY : natural := (FREQ / BAUDRATE + 1) * T_clk;
+    constant T_clk : time := 5 ns;
+    constant FREQ     : natural := 200_000_000;
+    constant BAUDRATE : natural := 115_200;
+    constant BITDELAY : time := (FREQ / BAUDRATE + 1) * T_clk;
 
-    signal clock, reset, uartRx, uartTx : std_logic;
+    signal sysclk_n, sysclk_p, reset, uartRx, uartTx : std_logic;
 
-    component NeuromorphicProcessor is
+    component NeuroTop is
         port (
-            clock  : in std_logic;
-            reset  : in std_logic;
-            uartRx : in std_logic;
-            uartTx : out std_logic
+            sysclk_n : in std_logic;
+            sysclk_p : in std_logic;
+            reset    : in std_logic;
+            uartRx   : in std_logic;
+            uartTx   : out std_logic
         );
     end component;
 
-    shared variable cycleCnt : natural := 0;
+    shared variable timeCount : time := 0 sec;
 
 begin
 
-    dut : NeuromorphicProcessor
-    port map ( clock, reset, uartRx, uartTx );
+    dut : NeuroTop
+    port map ( sysclk_n=>sysclk_n, 
+               sysclk_p=>sysclk_p, 
+               reset=>reset, 
+               uartTx=>uartTx, 
+               uartRx=>uartRx );
 
     stimuli : process is
-        file image   : text open read_mode is "./src/test/scala/neuroproc/systemtests/image.txt";
-        file results : text open read_mode is "./src/test/scala/neuroproc/systemtests/results.txt";
+        file image   : text open read_mode is "image.txt";
+        file results : text open read_mode is "results.txt";
         variable L   : line;
         variable val : integer;
         variable index, rxRate : std_logic_vector(15 downto 0);
@@ -88,9 +93,9 @@ begin
     begin
 
         -- Reset the accelerator
-        reset  <= '1';
+        reset  <= '0';
         uartRx <= '1';
-        wait until falling_edge(clock);
+        wait until falling_edge(sysclk_p);
         reset  <= '0';
         wait for T_clk;
 
@@ -115,7 +120,7 @@ begin
 
         -- Read out spikes and verify according to results file
         readline(results, L);
-        outp : while cycleCnt < FREQ loop
+        outp : while timeCount < 1 sec loop
             if uartTx = '0' then
                 rec_byte;
                 val := read_integer;
@@ -132,9 +137,9 @@ begin
 
     clk : process is
     begin
-        clock <= '1'; wait for T_clk / 2;
-        clock <= '0'; wait for T_clk / 2;
-        cycleCnt := cycleCnt + 1;
+        sysclk_p <= '1'; sysclk_n <= '0'; wait for T_clk / 2;
+        sysclk_p <= '0'; sysclk_n <= '1'; wait for T_clk / 2;
+        timeCount := timeCount + T_clk;
     end process clk;
 
 end rtl;

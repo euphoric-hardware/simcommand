@@ -3,7 +3,7 @@ package neuroproc
 import chisel3._
 import chisel3.util._
 
-class NeuronCore(coreID: Int) extends Module {
+class NeuronCore(coreID: Int, synth: Boolean = false) extends Module {
   val io = IO(new Bundle {
     val pmClkEn = Output(Bool())
     val newTS   = Input(Bool())
@@ -19,7 +19,7 @@ class NeuronCore(coreID: Int) extends Module {
   val interface  = Module(new BusInterface(coreID))
   val axonSystem = Module(new AxonSystem)
   val spikeTrans = Module(new TransmissionSystem(coreID))
-  val neurons    = Module(new Neurons(coreID))
+  val neurons    = Module(new Neurons(coreID, synth))
 
   interface.io.grant      := io.grant
   io.req                  := interface.io.reqOut

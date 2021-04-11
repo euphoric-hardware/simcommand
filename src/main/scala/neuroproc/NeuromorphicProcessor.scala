@@ -89,7 +89,7 @@ class NeuromorphicProcessor(synth: Boolean = false) extends Module {
 
     // All relevant cores and their interconnect
     val inCores  = (0 until 2).map(i => Module(new InputCore(i)))
-    val neuCores = (2 until 4).map(i => Module(new NeuronCore(i)))
+    val neuCores = (2 until 4).map(i => Module(new NeuronCore(i, synth)))
     val outCore  = Module(new OutputCore(4))
 
     // Interconnect memories and in-/out-cores
