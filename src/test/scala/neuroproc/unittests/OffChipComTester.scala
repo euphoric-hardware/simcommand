@@ -2,21 +2,21 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util.log2Up
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import chiseltest.internal.VerilatorBackendAnnotation
+import org.scalatest._
 
-class OffChipComTester extends AnyFlatSpec with ChiselScalatestTester {
+class OffChipComTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Off-chip Communication"
 
   // Change these values for the tests - keep FREQ_L and BAUDRATE_L relatively low!
   val SCALE      = 8192
   val FREQ_L     = FREQ / SCALE
-  val BAUDRATE_L = BAUDRATE / SCALE
+  val BAUDRATE_L = BAUDRATE / (SCALE / 8)
   val bitDelay   = FREQ_L / BAUDRATE_L + 1
 
   // Method to clear the inputs of the dut
@@ -50,7 +50,7 @@ class OffChipComTester extends AnyFlatSpec with ChiselScalatestTester {
   it should "receive a frequency" in {
     test(new OffChipCom(FREQ_L, BAUDRATE_L)).withAnnotations(Seq(WriteVcdAnnotation)) {
       dut =>
-        dut.clock.setTimeout(40*bitDelay)
+        dut.clock.setTimeout(FREQ_L)
         resetInputs(dut)
 
         // For the first input core
@@ -100,7 +100,7 @@ class OffChipComTester extends AnyFlatSpec with ChiselScalatestTester {
   it should "transfer a spike" in {
     test(new OffChipCom(FREQ_L, BAUDRATE_L)).withAnnotations(Seq(WriteVcdAnnotation)) {
       dut =>
-        dut.clock.setTimeout(10*bitDelay)
+        dut.clock.setTimeout(FREQ_L)
         resetInputs(dut)
         dut.io.inC0HSin.poke(true.B)
 
@@ -135,7 +135,7 @@ class OffChipComTester extends AnyFlatSpec with ChiselScalatestTester {
   it should "receive a full image" taggedAs(SlowTest) in {
     test(new OffChipCom(FREQ_L, BAUDRATE_L)) {
       dut =>
-        dut.clock.setTimeout(INPUTSIZE*40*bitDelay)
+        dut.clock.setTimeout(FREQ_L)
         resetInputs(dut)
 
         // Receive a full image - in phase 0

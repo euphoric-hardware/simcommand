@@ -24,7 +24,7 @@ class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false)
     s"evaldatac${coreID}e${evalID}.mem"
   else
     s"mapping/meminit/evaldatac${coreID}e${evalID}.mem"
-  loadMemoryFromFileInline( // chisel3 3.5-SNAPSHOT needed for inline version
+  loadMemoryFromFileInline(
     eMem, file, MemoryLoadFileType.Binary
   )
 

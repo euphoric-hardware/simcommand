@@ -2,17 +2,17 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.VcsBackendAnnotation
+import chiseltest.internal.VerilatorBackendAnnotation
+import org.scalatest._
 
-class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester {
+class DerivedClocksTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Derived clock system"
 
-  it should "work with multiple clocks" taggedAs(VcsTest, SlowTest) in {
+  it should "work with multiple clocks" taggedAs(SlowTest) in {
     test(new Module {
       val io = IO(new Bundle {
         val uartTx = Output(Bool())
@@ -34,9 +34,10 @@ class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester {
       clock2 := buf2.io.O
 
       // A test memory
-      val mem = Module(TrueDualPortFIFO(16, 8))
-      mem.io.clki := clock2.asBool
-      mem.io.clko := clock1.asBool
+      val mem = Module(new TrueDualPortFIFO(4, 8))
+      mem.io.clki := clock2
+      mem.io.clko := clock1
+      mem.io.rst  := reset.asBool
 
       // First clock domain manages transfers
       val newTS = Wire(Bool())
@@ -80,7 +81,7 @@ class DerivedClocksTester extends AnyFlatSpec with ChiselScalatestTester {
           }
         }
       }
-    }).withAnnotations(Seq(VcsBackendAnnotation)) {
+    }).withAnnotations(Seq(VerilatorBackendAnnotation)) {
       dut =>
         val nTests = 10
         dut.clock.setTimeout((nTests+2)*CYCLESPRSTEP)

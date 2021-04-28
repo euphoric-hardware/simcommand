@@ -25,7 +25,7 @@ jobs:
       run: sbt compile
 
     - name: Unit Tests
-      run: sbt "testOnly neuroproc.unittests.** -- -l neuroproc.unittests.VcsTest -l neuroproc.unittests.SlowTest"
+      run: sbt "testOnly neuroproc.unittests.** -- -l neuroproc.unittests.SlowTest"
 
   integration:
     name: System Tests
@@ -47,4 +47,4 @@ jobs:
       run: sbt compile
 
     - name: System Tests
-      run: sbt "testOnly neuroproc.systemtests.** -- -l neuroproc.systemtests.VcsTest -l neuroproc.systemtests.SlowTest" 
+      run: sbt "testOnly neuroproc.systemtests.** -- -l neuroproc.systemtests.SlowTest" 

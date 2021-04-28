@@ -17,7 +17,7 @@ The folder structure may be cleaned by
 Accelerator parameters are listed in _src/main/scala/neuroproc/package.scala_ and per default target a Xilinx Kintex-7 FPGA with [BUFGCE](https://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf) primitives inserted instead of the typical latch-based clock-gating cells used in ASICs.
 
 ## Install guide (tested with Ubuntu 20.04)
-The accelerator is written in [Chisel3](https://github.com/chipsalliance/chisel3) and tests are run using [ChiselTest](https://github.com/ucb-bar/chisel-testers2) with either the built-in [Treadle](https://github.com/chipsalliance/treadle) backend, the [Verilator](https://github.com/verilator/verilator) backend, or the Synopsys VCS backend. VCS is only used for the clock-gating tests which require support for derived clocks. These tests will be skipped if VCS is not available.
+The accelerator is written in [Chisel3](https://github.com/chipsalliance/chisel3) and tests are run using [ChiselTest](https://github.com/ucb-bar/chisel-testers2) with either the built-in [Treadle](https://github.com/chipsalliance/treadle) backend or the [Verilator](https://github.com/verilator/verilator) backend.
 
 ### Java 8
 Java 8 is preferred for Chisel3 thus far, although the code runs with Java 11 as well.
@@ -110,4 +110,4 @@ The available parameters are as follows
 | `--plot_interval`   | `250`   | Number of examples between updates to debug plots.                              |
 | `--update_interval` | `250`   | Number of examples between updates to neuron assignments and statistics prints. |
 
-This model achieves just above 70% accuracy on MNIST and roughly XX% accuracy on GSCD.
+This model achieves just above 70% accuracy on MNIST and roughly 50% accuracy on GSCD.

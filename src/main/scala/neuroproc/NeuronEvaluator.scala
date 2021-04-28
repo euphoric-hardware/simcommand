@@ -20,7 +20,7 @@ class NeuronEvaluator extends Module {
   val sumSat           = Wire(SInt(NEUDATAWIDTH.W))
   val sumIn1           = Wire(SInt((NEUDATAWIDTH+1).W))
   val sumIn2           = Wire(SInt((NEUDATAWIDTH+1).W))
-  val potDecay         = Wire(SInt(NEUDATAWIDTH.W)) //regEnable only works with a next declaration
+  val potDecay         = Wire(SInt(NEUDATAWIDTH.W))
   val refracRegNext    = Wire(SInt(NEUDATAWIDTH.W))
   val membPotRegNext   = Wire(SInt(NEUDATAWIDTH.W))
   val spikeIndiRegNext = Wire(Bool())
@@ -39,11 +39,12 @@ class NeuronEvaluator extends Module {
   spikeIndiRegNext := spikeIndiReg
 
   // Saturation
-  sumSat := sum
-  when(sum < (0-(scala.math.pow(2,NEUDATAWIDTH-1))).asInstanceOf[Int].S) {
-    sumSat := (0-(scala.math.pow(2,NEUDATAWIDTH-1))).asInstanceOf[Int].S
-  }.elsewhen(sum > (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S) {
-    sumSat := (scala.math.pow(2,NEUDATAWIDTH-1)-1).asInstanceOf[Int].S
+  when(sum < (0 - (1 << (NEUDATAWIDTH-1))).S) {
+    sumSat := (0 - (1 << (NEUDATAWIDTH-1))).S
+  }.elsewhen(sum > ((1 << (NEUDATAWIDTH-1)) - 1).S) {
+    sumSat := ((1 << (NEUDATAWIDTH-1)) - 1).S
+  }.otherwise {
+    sumSat := sum
   }
 
   // Next membrane potential selection
@@ -60,7 +61,6 @@ class NeuronEvaluator extends Module {
   }
 
   // Constant multiplier for estimated decay
-  // TODO: Check if this can be replaced by ``potDecay := membPotReg >> io.dataIn(2, 0)``
   // |--Shift--|--Decay--| //
   // |    0    | 100    %| //
   // |    1    |  50    %| //
@@ -70,40 +70,10 @@ class NeuronEvaluator extends Module {
   // |    5    |   3.125%| //
   // |    6    |   1.563%| //
   // |    7    |   0.781%| //
-  val decaySwitch = Wire(UInt(3.W))
-  decaySwitch := io.dataIn(2,0).asUInt
-  potDecay := membPotReg // default
-  switch(io.dataIn(2,0).asUInt) {
-    is(1.U){
-      potDecay := membPotReg >> 1  //50%
-    }
-    is(2.U){
-      potDecay := membPotReg >> 2  //25%
-    }
-    is(3.U){
-      potDecay := membPotReg >> 3  //12.5%
-    }
-    is(4.U){
-      potDecay := membPotReg >> 4  //6.25%
-    }
-    is(5.U){
-      potDecay := membPotReg >> 5  //3.125%
-    }
-    is(6.U){
-      potDecay := membPotReg >> 6  //1.563%
-    }
-    is(7.U){
-      potDecay := membPotReg >> 7  //0.781%
-    }
-  }
-
+  potDecay := membPotReg >> io.dataIn(2, 0)
+  
   // Next refraction count selection
-  // Replaceable by ``refracRegNext := Mux(io.cntrSels.refracSel === 0.U, io.dataIn, refracCntReg)``
-  when(io.cntrSels.refracSel === 0.U) {
-    refracRegNext := io.dataIn
-  }.otherwise {
-    refracRegNext := refracCntReg
-  }
+  refracRegNext := Mux(io.cntrSels.refracSel === 0.U, io.dataIn, refracCntReg)
 
   // Next spike indirection selection
   switch(io.cntrSels.spikeSel) {
@@ -129,9 +99,9 @@ class NeuronEvaluator extends Module {
     }
     is(2.U) {
       when(io.refracIndi) {
-        when(spikeIndiReg){
+        when(spikeIndiReg) {
           io.dataOut := io.dataIn
-        }.otherwise{
+        }.otherwise {
           io.dataOut := refracCntReg
         }
       }.otherwise {

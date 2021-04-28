@@ -2,13 +2,13 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest._
 
-class BusInterfaceTester extends AnyFlatSpec with ChiselScalatestTester {
+class BusInterfaceTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Bus Interface"
 
   it should "work with all-low inputs" in {

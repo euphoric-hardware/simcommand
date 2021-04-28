@@ -3,7 +3,6 @@ package neuroproc
 import chisel3._
 import chisel3.util._
 
-// This file is very hard coded for this project
 class OffChipCom(frequency: Int, baudRate: Int) extends Module {
   val io = IO(new Bundle {
     val tx = Output(Bool())

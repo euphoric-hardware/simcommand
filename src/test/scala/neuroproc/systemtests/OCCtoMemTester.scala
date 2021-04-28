@@ -2,14 +2,20 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
+import chiseltest.experimental.UncheckedClockPoke._
+import chiseltest.experimental.UncheckedClockPeek._
+import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest._
 
-class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
+class OCCtoMemTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Off-chip Communication with memory"
+
+  val SCALE      = 8192
+  val FREQ_L     = FREQ / SCALE
+  val BAUDRATE_L = BAUDRATE / (SCALE / 4)
 
   it should "work with dual-port memory" taggedAs(SlowTest) in {
     test(new Module {
@@ -18,7 +24,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
         val inC0HSin  = Input(Bool())
         val inC1HSin  = Input(Bool())
 
-        val clkb   = Input(Bool())
+        val clkb   = Input(Clock())
 
         val enb0   = Input(Bool())
         val addrb0 = Input(UInt((RATEADDRWIDTH+1).W))
@@ -30,7 +36,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
       })
 
       // Off-chip communication
-      val oc = Module(new OffChipCom(FREQ, BAUDRATE))
+      val oc = Module(new OffChipCom(FREQ_L, BAUDRATE_L))
       oc.io.rx     := io.rx
       oc.io.qData  := 0.U
       oc.io.qEmpty := true.B
@@ -38,8 +44,8 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
       oc.io.inC1HSin := io.inC1HSin
 
       // True dual port memories
-      val mem0 = Module(TrueDualPortMemory(RATEADDRWIDTH+1, RATEWIDTH))
-      mem0.io.clka  := clock.asBool
+      val mem0 = Module(new TrueDualPortMemory(RATEADDRWIDTH+1, RATEWIDTH))
+      mem0.io.clka  := clock
       mem0.io.clkb  := io.clkb
       mem0.io.web   := false.B
       mem0.io.dib   := 0.U
@@ -47,8 +53,8 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
       mem0.io.addrb := io.addrb0
       io.dob0 := mem0.io.dob
 
-      val mem1 = Module(TrueDualPortMemory(RATEADDRWIDTH+1, RATEWIDTH))
-      mem1.io.clka  := clock.asBool
+      val mem1 = Module(new TrueDualPortMemory(RATEADDRWIDTH+1, RATEWIDTH))
+      mem1.io.clka  := clock
       mem1.io.clkb  := io.clkb
       mem1.io.web   := false.B
       mem1.io.dib   := 0.U
@@ -64,12 +70,12 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
 
       mem1.io.ena   := oc.io.inC1We
       mem1.io.wea   := oc.io.inC1We
-      mem1.io.addra := oc.io.inC0Addr
+      mem1.io.addra := oc.io.inC1Addr
       mem1.io.dia   := oc.io.inC1Di
 
-    }).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) {
+    }).withAnnotations(Seq(WriteVcdAnnotation)) {
       dut =>
-        val delay = FREQ / BAUDRATE + 1
+        val delay = FREQ_L / BAUDRATE_L + 1
         val numTests = 64
 
         def recByte(byte: UInt) = {
@@ -85,8 +91,8 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
 
         def stepClkb(cycles: Int = 1) = {
           for (_ <- 0 until cycles) {
-            dut.io.clkb.poke(true.B)
-            dut.io.clkb.poke(false.B)
+            dut.io.clkb.high()
+            dut.io.clkb.low()
           }
         }
 
@@ -95,7 +101,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.rx.poke(true.B)
         dut.io.inC0HSin.poke(true.B)
         dut.io.inC1HSin.poke(true.B)
-        dut.io.clkb.poke(false.B)
+        dut.io.clkb.low()
         dut.io.enb0.poke(false.B)
         dut.io.addrb0.poke(0.U)
         dut.io.enb1.poke(false.B)
@@ -136,6 +142,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.enb0.poke(true.B)
         dut.io.addrb1.poke(((ind1.litValue & 0xff) + NEURONSPRCORE).U)
         dut.io.enb1.poke(true.B)
+        dut.clock.step()
         stepClkb()
         dut.io.enb0.poke(false.B)
         dut.io.enb1.poke(false.B)
@@ -143,6 +150,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.dob1.expect(frq1)
 
         // Repeat the above for random inputs
+        println("Receive some random inputs")
         val rng = new scala.util.Random(42)
         val testInds = Array.fill(numTests) { rng.nextInt(INPUTSIZE).U(16.W) }
         val testFrqs = Array.fill(numTests) { BigInt(RATEWIDTH, rng).U(16.W) }
@@ -158,6 +166,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
         }
 
         // Check the memories
+        println("Check the memory content")
         for (i <- 0 until (1 << (RATEADDRWIDTH+1))) {
           dut.io.enb0.poke(true.B)
           dut.io.addrb0.poke(i.U)
@@ -174,7 +183,7 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
   it should "work with FIFO queue" in {
     test(new Module {
       val io = IO(new Bundle {
-        val clki  = Input(Bool())
+        val clki  = Input(Clock())
         val we    = Input(Bool())
         val datai = Input(UInt(8.W))
         val full  = Output(Bool())
@@ -183,28 +192,29 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
       })
 
       // Off-chip communication
-      val oc = Module(new OffChipCom(FREQ, BAUDRATE))
+      val oc = Module(new OffChipCom(FREQ_L, BAUDRATE_L))
       oc.io.rx       := true.B // \
       oc.io.inC0HSin := true.B // Force staying in idle state without receiving anything
       oc.io.inC1HSin := true.B // /
       io.tx          := oc.io.tx
 
       // True dual port memory-based FIFO
-      val fifo = Module(TrueDualPortFIFO(16, 8))
+      val fifo = Module(new TrueDualPortFIFO(4, 8))
       fifo.io.clki  := io.clki
       fifo.io.we    := io.we
+      fifo.io.rst   := reset.asBool
       fifo.io.datai := io.datai
       io.full       := fifo.io.full
-      fifo.io.clko  := clock.asBool
+      fifo.io.clko  := clock
 
       // Interconnect
       fifo.io.en   := oc.io.qEn
       oc.io.qData  := fifo.io.datao
       oc.io.qEmpty := fifo.io.empty
 
-    }).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) {
+    }).withAnnotations(Seq(WriteVcdAnnotation)) {
       dut =>
-        val delay = FREQ / BAUDRATE + 1
+        val delay = FREQ_L / BAUDRATE_L + 1
         val numTests = 64
 
         def transferByte() = {
@@ -224,14 +234,14 @@ class OCCtoMemTester extends AnyFlatSpec with ChiselScalatestTester {
 
         def stepClki(cycles: Int = 1) = {
           for (_ <- 0 until cycles) {
-            dut.io.clki.poke(true.B)
-            dut.io.clki.poke(false.B)
+            dut.io.clki.high()
+            dut.io.clki.low()
           }
         }
 
         // Reset inputs
         dut.clock.setTimeout(10*numTests*delay)
-        dut.io.clki.poke(false.B)
+        dut.io.clki.low()
         dut.io.we.poke(false.B)
         dut.io.datai.poke(0.U)
         dut.reset.poke(true.B)

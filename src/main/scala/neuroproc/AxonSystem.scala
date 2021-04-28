@@ -20,7 +20,7 @@ class AxonSystem extends Module {
   // Counter logic
   val inOutReg = RegNext(io.inOut)
   val spikeCntReg = RegInit(0.U(AXONIDWIDTH.W))
-  when(inOutReg =/= io.inOut) { //new time step
+  when(inOutReg =/= io.inOut) { // new time step
     spikeCntReg := 0.U
   }.elsewhen(io.axonValid) {
     spikeCntReg := spikeCntReg + 1.U

@@ -2,13 +2,13 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest._
 
-class NeuronsTester extends AnyFlatSpec with ChiselScalatestTester {
+class NeuronsTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Neurons"
 
   it should "handle a spike" in {

@@ -2,14 +2,14 @@ package neuroproc.unittests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest._
 
-class TransmissionSystemTester extends AnyFlatSpec with ChiselScalatestTester {
+class TransmissionSystemTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Transmission System"
 
   it should "transmit spikes" in {

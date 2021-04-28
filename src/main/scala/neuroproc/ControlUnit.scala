@@ -34,14 +34,14 @@ class ControlUnit(coreID : Int) extends Module {
   val idle :: rRefrac :: rPot :: rDecay :: rWeight1 :: rWeight2 :: rBias :: rThresh :: rRefracSet :: wRefrac :: rPotSet :: wPot :: Nil = Enum(12)
   val state = RegInit(idle)
 
-  val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // used to deliver spike pulses to transmission
+  val spikePulse     = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to deliver spike pulses to transmission
   val nNext          = Wire(UInt(N.W))
-  val n              = RegNext(nNext) // time multiplex evaluation counter
+  val n              = RegNext(nNext)                                 // Time multiplexing evaluation counter
   val aNext          = Wire(UInt(AXONIDWIDTH.W))
-  val a              = RegNext(aNext) //axon system addr counter
-  val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W)) //register that stores sample of axons incoming spike counter
-  val inOut          = RegInit(false.B) //used to inform spike system of new timestep
-  val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit have evaluated all mapped neurons
+  val a              = RegNext(aNext)                                 // Axon system address counter
+  val spikeCnt       = RegInit(0.U(AXONIDWIDTH.W))                    // Sample of incoming spike counter
+  val inOut          = RegInit(false.B)                               // Used for new time step signaling
+  val evalUnitActive = RegInit(VecInit(Seq.fill(EVALUNITS)(false.B))) // Used to decide if a evaluation unit has evaluated all mapped neurons
   val localCntrSels  = Wire(Vec(EVALUNITS, new EvalCntrSigs()))
 
   val evalAddr     = Wire(UInt(EVALMEMADDRWIDTH.W))
@@ -59,7 +59,7 @@ class ControlUnit(coreID : Int) extends Module {
     localCntrSels(i).writeDataSel := 0.U
     localCntrSels(i).decaySel     := false.B
 
-    when(evalUnitActive(i)) { // ensures that eval unit is still when all its neurons has been evauated
+    when(evalUnitActive(i)) { // Ensures that evaluation units are still when all its neurons have been evaluated
       io.cntrSels(i).potSel       := localCntrSels(i).potSel
       io.cntrSels(i).spikeSel     := localCntrSels(i).spikeSel
       io.cntrSels(i).refracSel    := localCntrSels(i).refracSel
@@ -93,7 +93,7 @@ class ControlUnit(coreID : Int) extends Module {
   addrSpecific := 0.U
   evalAddr     := addrOffset + addrSpecific
 
-  // Set evaluations units active state. (Usure still when all mapped neurons are evaluated)
+  // Set evaluations units active state
   for (i <- 0 until EVALUNITS) {
     evalUnitActive(i) := nrNeuMapped > ((n << log2Up(EVALUNITS)) + i.U)
   }

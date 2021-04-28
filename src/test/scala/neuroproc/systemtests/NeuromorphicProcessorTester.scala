@@ -2,14 +2,14 @@ package neuroproc.systemtests
 
 import neuroproc._
 
-import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{VcsBackendAnnotation, WriteVcdAnnotation}
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
+import org.scalatest._
 import java.io.{FileNotFoundException, IOException}
 
-class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester {
+class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester {
   behavior of "Neuromorphic Processor"
 
   val bitDelay = FREQ / BAUDRATE + 1
@@ -34,16 +34,16 @@ class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester
   }
 
   if (!RANKORDERENC) {
-    it should "process an image" taggedAs(VcsTest, SlowTest) in {
+    it should "process an image" in {
       test(new NeuromorphicProcessor())
-        .withAnnotations(Seq(VcsBackendAnnotation, WriteVcdAnnotation)) {
+        .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut =>
           dut.clock.setTimeout(FREQ)
-
+        
           // Reference image and results
           val image = fetch("./src/test/scala/neuroproc/systemtests/image.txt")
           val results = fetch("./src/test/scala/neuroproc/systemtests/results.txt")
-
+        
           def receiveByte(byte: UInt) = {
             // Start bit
             dut.io.uartRx.poke(false.B)
@@ -57,7 +57,7 @@ class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester
             dut.io.uartRx.poke(true.B)
             dut.clock.step(bitDelay)
           }
-
+        
           def transferByte() = {
             var byte = 0
             // Assumes start bit has already been seen
@@ -69,10 +69,10 @@ class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester
             }
             // Stop bit
             dut.io.uartTx.expect(true.B)
-            dut.clock.step(bitDelay)
+            //dut.clock.step(bitDelay)
             byte
           }
-
+        
           // Reset inputs
           dut.io.uartRx.poke(true.B)
           dut.io.uartTx.expect(true.B)
@@ -80,47 +80,43 @@ class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester
           dut.clock.step()
           dut.reset.poke(false.B)
           dut.io.uartTx.expect(true.B)
-
-          // Load an image into the accelerator ...
-          println("Loading image into accelerator")
-          var inject = true
-          val inj = fork {
-            for (i <- 0 until image.length) {
-              // Write top byte of index, bottom byte of index, top byte of rate,
-              // and bottom byte of rate
-              receiveByte((i >> 8).U(8.W))
-              receiveByte((i & 0xff).U(8.W))
-              receiveByte((image(i) >> 8).U(8.W))
-              receiveByte((image(i) & 0xff).U(8.W))
-            }
-            println("Done loading image - waiting for phase change")
-            while (inject)
-              dut.clock.step()
-          }
-          dut.clock.step(FREQ/2)
-          inject = false
-          inj.join
-
-          // ... get its response
-          println("Phase changed - getting accelerator's response")
+        
+          // Spawn a receiver thread
           var spikes = Array[Int]()
           var receive = true
-          var spiked = false
-          dut.io.uartTx.expect(true.B)
           val rec = fork {
             while (receive) {
-              if (!dut.io.uartTx.peek.litToBoolean)
-                spikes = spikes :+ transferByte()
+              if (!dut.io.uartTx.peek.litToBoolean) {
+                val s = transferByte()
+                if (s < 200)
+                  spikes = spikes :+ s
+                println(s"Received spike ${s}")
+              }
               dut.clock.step()
             }
           }
+        
+          // Load an image into the accelerator ...
+          println("Loading image into accelerator")
+          for (i <- 0 until image.length) {
+            // Write top byte of index, bottom byte of index, top byte of rate,
+            // and bottom byte of rate
+            receiveByte((i >> 8).U(8.W))
+            receiveByte((i & 0xff).U(8.W))
+            receiveByte((image(i) >> 8).U(8.W))
+            receiveByte((image(i) & 0xff).U(8.W))
+          }
+          print("Done loading image - ")
+        
+          // ... get its response
+          println("getting accelerator's response")
           dut.clock.step(FREQ/2)
           receive = false
           rec.join
-
+        
           println("Response received - comparing results")
-          assert(results.length == spikes.length, "number of spikes does not match expected")
-          assert(results.zip(spikes).map(x => x._1 == x._2).reduce(_ && _), "spikes do not match expected")
+          assert(spikes.length == results.length, "number of spikes does not match expected")
+          assert(spikes.zip(results).map(x => x._1 == x._2).reduce(_ && _), "spikes do not match expected")
       }
     }
   }

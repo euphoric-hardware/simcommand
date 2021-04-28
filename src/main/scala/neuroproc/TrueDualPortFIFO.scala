@@ -8,183 +8,154 @@ class TrueDualPortFIFOIO(val addrW: Int, val dataW: Int) extends Bundle {
   require(dataW > 0, "data width must be greater than 0")
 
   // clki and clko must be of type Bool to work correctly in ChiselTest
-  val clki  = Input(Bool())
+  val clki  = Input(Clock())
   val we    = Input(Bool())
   val datai = Input(UInt(dataW.W))
   val full  = Output(Bool())
 
-  val clko  = Input(Bool())
+  val clko  = Input(Clock())
   val en    = Input(Bool())
   val datao = Output(UInt(dataW.W))
   val empty = Output(Bool())
+
+  val rst = Input(Bool())
 }
 
-abstract class TrueDualPortFIFO(addrW: Int, dataW: Int) extends Module {
+class TrueDualPortFIFO(addrW: Int, dataW: Int) extends RawModule {
   val io = IO(new TrueDualPortFIFOIO(addrW, dataW))
-}
 
-class TrueDualPortFIFOBB(addrW: Int, dataW: Int) extends HasBlackBoxInline {
-  private[TrueDualPortFIFOBB] class FIFOBBIO extends TrueDualPortFIFOIO(addrW, dataW) {
-    val reset = Input(Reset())
+  private[TrueDualPortFIFO] def grayIncrement(c: UInt, n: Int) = {
+    val b1 = Wire(UInt(n.W))
+    val bVec = VecInit((0 until n).map( i => c(n-1, i).xorR() ).toSeq) // Gray to Binary
+    b1 := bVec.asUInt + 1.U                                            // Binary increment
+    b1 ^ (0.U(1.W) ## b1(n-1, 1))                                      // Binary to Gray
   }
-  val io = IO(new FIFOBBIO)
-  val numElements = ((1 << addrW) - 1)
-  setInline("TrueDualPortFIFOBB.v",
-  s"""
-  |module TrueDualPortFIFOBB(clki, we, datai, full,
-  |                          clko, en, datao, empty,
-  |                          reset);
-  |input clki, we, clko, en, reset;
-  |input  [${dataW-1}:0] datai;
-  |output full, empty;
-  |output reg [${dataW-1}:0] datao;
-  |reg    [${dataW-1}:0] ram [${((1 << addrW) - 1)}:0];
-  |wire   [${addrW-1}:0] wAddrNext, rAddrNext;
-  |reg    [${addrW-1}:0] wAddr, rAddr;
-  |reg emptyReg, fullReg;
-  |initial emptyReg = 1'b1;
-  |initial fullReg  = 1'b0;
-  |
-  |// Combinational logic
-  |assign wAddrNext = wAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : wAddr + 1;
-  |assign rAddrNext = rAddr == ${numElements} ? ${addrW}'b${"0"*addrW} : rAddr + 1;
-  |
-  |assign full  = fullReg;
-  |assign empty = emptyReg;
-  |
-  |// Write port
-  |always @(posedge clki)
-  |begin
-  |  if (reset)
-  |  begin
-  |    fullReg <= 1'b0;
-  |    wAddr   <= ${addrW}'b${"0"*addrW};
-  |  end else begin
-  |    if (we)
-  |    begin
-  |      ram[wAddr] <= datai;
-  |      wAddr <= wAddrNext;
-  |    end
-  |
-  |    if (we && wAddrNext == rAddr)
-  |      fullReg <= 1'b1;
-  |    else if (fullReg && wAddr != rAddr)
-  |      fullReg <= 1'b0;
-  |  end
-  |end
-  |
-  |// Read port
-  |always @(posedge clko)
-  |begin
-  |  if (reset)
-  |  begin
-  |    emptyReg <= 1'b1;
-  |    rAddr    <= ${addrW}'b${"0"*addrW};
-  |  end else begin
-  |    if (en)
-  |    begin
-  |      datao <= ram[rAddr];
-  |      rAddr <= rAddrNext;
-  |    end
-  |      
-  |    if (emptyReg && rAddr != wAddr)
-  |      emptyReg <= 1'b0;
-  |    else if (en && rAddrNext == wAddr)
-  |      emptyReg <= 1'b1;
-  |  end
-  |end
-  |
-  |endmodule
-  """.stripMargin)
-}
 
-class TrueDualPortFIFOVerilog(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {
-  val fifo = Module(new TrueDualPortFIFOBB(addrW, dataW))
-  fifo.io.clki  := io.clki
-  fifo.io.we    := io.we
-  fifo.io.datai := io.datai
-  io.full := fifo.io.full
+  private[TrueDualPortFIFO] class WriteControl(addrW: Int) extends RawModule {
+    val io = IO(new Bundle {
+      val clkw   = Input(Clock())
+      val resetw = Input(Bool())
+      val wr     = Input(Bool())
+      val rPtr   = Input(UInt((addrW+1).W))
+      val full   = Output(Bool())
+      val wPtr   = Output(UInt((addrW+1).W))
+      val wAddr  = Output(UInt(addrW.W))
+    })
 
-  fifo.io.clko  := io.clko
-  fifo.io.en    := io.en
-  io.datao := fifo.io.datao
-  io.empty := fifo.io.empty
+    withClockAndReset(io.clkw, io.resetw.asAsyncReset) {
+      // Internal signals
+      val wPtrNext = Wire(UInt((addrW+1).W))
+      val gray1 = Wire(UInt((addrW+1).W))
+      val wAddr = Wire(UInt(addrW.W))
+      val wAddrMsb = Wire(Bool())
+      val rAddrMsb = Wire(Bool())
+      val fullFlag = Wire(Bool())
 
-  fifo.io.reset := reset
-}
+      // Write pointer register
+      val wPtr = RegNext(wPtrNext, 0.U)
+      
+      // (N+1)-bit Gray counter
+      gray1 := grayIncrement(wPtr, addrW+1)
 
-class TrueDualPortFIFOChisel(addrW: Int, dataW: Int) extends TrueDualPortFIFO(addrW, dataW) {
-  val numElements = ((1 << addrW) - 1)
+      // Update write pointer
+      wPtrNext := Mux(io.wr && !fullFlag, gray1, wPtr)
 
-  // The queue is implemented as a true dual port RAM
-  val ram = Module(TrueDualPortMemory(addrW, dataW))
+      // N-bit Gray counter
+      wAddrMsb := wPtr(addrW) ^ wPtr(addrW-1)
+      wAddr    := wAddrMsb ## wPtr(addrW-2, 0)
+
+      // Full flag generation
+      rAddrMsb := io.rPtr(addrW) ^ io.rPtr(addrW-1)
+      fullFlag := (io.rPtr(addrW) =/= wPtr(addrW)) && (io.rPtr(addrW-2, 0) === wPtr(addrW-2, 0)) && (rAddrMsb === wAddrMsb)
+
+      // Output
+      io.wAddr := wAddr
+      io.wPtr  := wPtr
+      io.full  := fullFlag
+    }
+  }
+
+  private[TrueDualPortFIFO] class ReadControl(addrW: Int) extends RawModule {
+    val io = IO(new Bundle {
+      val clkr   = Input(Clock())
+      val resetr = Input(Bool())
+      val rd     = Input(Bool())
+      val wPtr   = Input(UInt((addrW+1).W))
+      val empty  = Output(Bool())
+      val rPtr   = Output(UInt((addrW+1).W))
+      val rAddr  = Output(UInt(addrW.W))
+    })
+
+    withClockAndReset(io.clkr, io.resetr.asAsyncReset) {
+      // Internal signals
+      val rPtrNext = Wire(UInt((addrW+1).W))
+      val gray1 = Wire(UInt((addrW+1).W))
+      val rAddr = Wire(UInt(addrW.W))
+      val rAddrMsb  = Wire(Bool())
+      val wAddrMsb  = Wire(Bool())
+      val emptyFlag = Wire(Bool())
+
+      // Read pointer register
+      val rPtr = RegNext(rPtrNext, 0.U)
+
+      // (N+1)-bit Gray counter
+      gray1 := grayIncrement(rPtr, addrW+1)
+
+      // Update read pointer
+      rPtrNext := Mux(io.rd && !emptyFlag, gray1, rPtr)
+
+      // N-bit Gray counter
+      rAddrMsb := rPtr(addrW) ^ rPtr(addrW-1)
+      rAddr    := rAddrMsb ## rPtr(addrW-2, 0)
+
+      // Empty flag generation
+      wAddrMsb  := io.wPtr(addrW) ^ io.wPtr(addrW-1)
+      emptyFlag := (io.wPtr(addrW) === rPtr(addrW)) && (io.wPtr(addrW-2, 0) === rPtr(addrW-2, 0)) && (wAddrMsb === rAddrMsb)
+
+      // Output
+      io.rAddr := rAddr
+      io.rPtr  := rPtr
+      io.empty := emptyFlag
+    }
+  }
+
+  // Instantiating and interconnecting components
+  val ram   = Module(new TrueDualPortMemory(addrW, dataW))
+  val wctrl = Module(new WriteControl(addrW))
+  val rctrl = Module(new ReadControl(addrW))
   val wAddr = Wire(UInt(addrW.W))
+  val wPtr  = Wire(UInt((addrW+1).W))
   val rAddr = Wire(UInt(addrW.W))
+  val rPtr  = Wire(UInt((addrW+1).W))
+
+  // Write side (port A)
   ram.io.clka  := io.clki
-  ram.io.ena   := io.we
-  ram.io.wea   := io.we
   ram.io.addra := wAddr
   ram.io.dia   := io.datai
+  ram.io.ena   := io.we && !wctrl.io.full
+  ram.io.wea   := io.we && !wctrl.io.full
 
+  wctrl.io.clkw := io.clki
+  wctrl.io.resetw := io.rst
+  wctrl.io.wr := io.we
+  wctrl.io.rPtr := rPtr
+  io.full := wctrl.io.full
+  wPtr := wctrl.io.wPtr
+  wAddr := wctrl.io.wAddr
+
+  // Read side (port B)
   ram.io.clkb  := io.clko
-  ram.io.enb   := io.en
-  ram.io.web   := false.B
   ram.io.addrb := rAddr
   ram.io.dib   := 0.U
+  ram.io.enb   := io.en && !rctrl.io.empty
+  ram.io.web   := false.B
   io.datao     := ram.io.dob
 
-  // Write port
-  withClock(io.clki.asClock) {
-    // Write address counter
-    val cntNext = Wire(UInt(addrW.W))
-    val cntReg  = RegEnable(cntNext, 0.U, io.we)
-    when(cntReg === numElements.U) {
-      cntNext := 0.U
-    }.otherwise {
-      cntNext := cntReg + 1.U
-    }
-    wAddr := cntReg
-
-    // Generate full signal
-    val full = RegInit(false.B)
-    when(io.we && cntNext === rAddr) {
-      full := true.B
-    }.elsewhen(full && cntReg =/= rAddr) {
-      full := false.B
-    }
-    io.full := full
-  }
-
-  // Read port
-  withClock(io.clko.asClock) {
-    // Read address counter
-    val cntNext = Wire(UInt(addrW.W))
-    val cntReg  = RegEnable(cntNext, 0.U, io.en)
-    when(cntReg === numElements.U) {
-      cntNext := 0.U
-    }.otherwise {
-      cntNext := cntReg + 1.U
-    }
-    rAddr := cntReg
-
-    // Generate empty signal
-    val empty = RegInit(true.B)
-    when(empty && cntReg =/= wAddr) {
-      empty := false.B
-    }.elsewhen(io.en && cntNext === wAddr) {
-      empty := true.B
-    }
-    io.empty := empty
-  }
-}
-
-object TrueDualPortFIFO {
-  def apply(numElements: Int, dataW: Int, synth: Boolean = false) = {
-    require(isPow2(numElements), "number of elements must be a power of 2")
-    val addrW = log2Up(numElements)
-    if (synth)
-      new TrueDualPortFIFOVerilog(addrW, dataW)
-    else
-      new TrueDualPortFIFOChisel(addrW, dataW)
-  }
+  rctrl.io.clkr := io.clko
+  rctrl.io.resetr := io.rst
+  rctrl.io.rd := io.en
+  rctrl.io.wPtr := wPtr
+  io.empty := rctrl.io.empty
+  rPtr := rctrl.io.rPtr
+  rAddr := rctrl.io.rAddr
 }
