@@ -16,6 +16,10 @@ object MakeDataFiles extends App {
   // Fetch the parameters from the specified JSON file
   val params = new ParameterReader(args(0))
 
+  // Create a directory for the files
+  val dir = new File("mapping/meminit")
+  dir.mkdir()
+
   // Generate memory initialization files
   for (core <- 2 until 4) {
     // Constant memories
