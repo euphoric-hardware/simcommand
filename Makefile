@@ -5,7 +5,7 @@ SBT := sbt
 all : proc vivado
 
 proc :
-	$(SBT) "runMain neuroproc.MakeDataFiles mapping/networkData.json"
+	$(SBT) "runMain MakeDataFiles mapping/networkData.json"
 	$(SBT) "runMain neuroproc.NeuromorphicProcessor"
 
 vivado :

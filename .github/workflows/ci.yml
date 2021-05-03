@@ -23,6 +23,9 @@ jobs:
 
     - name: Compile
       run: sbt compile
+    
+    - name: Create memory initialization
+      run: sbt "runMain MakeDataFiles mapping/networkData.json"
 
     - name: Unit Tests
       run: sbt "testOnly neuroproc.unittests.** -- -l neuroproc.unittests.SlowTest"
