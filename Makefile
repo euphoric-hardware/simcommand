@@ -5,7 +5,7 @@ SBT := sbt
 all : proc vivado
 
 proc :
-	$(SBT) "runMain neuroproc.MakeDataFiles"
+	$(SBT) "runMain neuroproc.MakeDataFiles mapping/networkData.json"
 	$(SBT) "runMain neuroproc.NeuromorphicProcessor"
 
 vivado :
@@ -16,6 +16,8 @@ clean :
 	$(SBT) clean
 	rm -rf build
 	rmdir build
+	rm -rf mapping/meminit
+	rmdir mapping/meminit
 	rm -rf target
 	rmdir target
 	rm -rf test_run_dir
@@ -23,9 +25,4 @@ clean :
 
 .PHONY : test
 test :
-	ifeq (, $(shell which vcs))
-		$(SBT) "testOnly neuroproc.unittests.* -- -l neuroproc.unittests.VcsTest"
-		$(SBT) "testOnly neuroproc.systemtests.* -- -l neuroproc.systemtests.VcsTest"
-	else
-		$(SBT) test
-	endif
+	$(SBT) test

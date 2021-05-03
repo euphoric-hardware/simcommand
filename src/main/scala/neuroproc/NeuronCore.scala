@@ -43,7 +43,3 @@ class NeuronCore(coreID: Int, synth: Boolean = false) extends Module {
   io.pmClkEn := !neurons.io.done || interface.io.reqOut
   neurons.io.newTS := io.newTS
 }
-
-object NeuronCore extends App {
-  (new chisel3.stage.ChiselStage).emitVerilog(new NeuronCore(2), Array("--target-dir", "build"))
-}

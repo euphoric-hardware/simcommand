@@ -28,7 +28,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // Check initial signal values
         dut.io.done.expect(true.B)
 
-        dut.io.addr.expect(0.U)
+        dut.io.addr.sel.expect(const)
+        dut.io.addr.pos.expect(0.U)
         dut.io.wr.expect(false.B)
         dut.io.ena.expect(false.B)
 
@@ -65,7 +66,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 1
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSREFRAC.U)
+        dut.io.addr.sel.expect(dynamic)
+        dut.io.addr.pos.expect(0.U)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS)
           dut.io.cntrSels(i).spikeSel.expect(1.U)
@@ -74,7 +76,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 2
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSPOTENTIAL.U)
+        dut.io.addr.sel.expect(dynamic)
+        dut.io.addr.pos.expect(TMNEURONS.U)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS)
           dut.io.cntrSels(i).refracSel.expect(0.U)
@@ -83,7 +86,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 3
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSDECAY.U)
+        dut.io.addr.sel.expect(const)
+        dut.io.addr.pos.expect(2.U)
         dut.io.aEna.expect(true.B)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS)
@@ -95,14 +99,16 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 6
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSBIAS.U)
+        dut.io.addr.sel.expect(biasthresh)
+        dut.io.addr.pos.expect(0.U)
         dut.io.done.expect(false.B)
         dut.clock.step()
 
         // State 7
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSTHRESH.U)
+        dut.io.addr.sel.expect(biasthresh)
+        dut.io.addr.pos.expect(TMNEURONS.U)
         dut.io.done.expect(false.B)
         dut.clock.step()
         // Some outputs unchanged because spikeCnt = 0
@@ -110,7 +116,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 8
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSREFRACSET.U)
+        dut.io.addr.sel.expect(const)
+        dut.io.addr.pos.expect(1.U)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS)
           dut.io.cntrSels(i).spikeSel.expect(0.U)
@@ -119,7 +126,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 9
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(true.B)
-        dut.io.addr.expect(OSREFRAC.U)
+        dut.io.addr.sel.expect(dynamic)
+        dut.io.addr.pos.expect(0.U)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS) {
           dut.io.cntrSels(i).writeDataSel.expect(2.U)
@@ -130,14 +138,16 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State A
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSPOTSET.U)
+        dut.io.addr.sel.expect(const)
+        dut.io.addr.pos.expect(0.U)
         dut.io.done.expect(false.B)
         dut.clock.step()
 
         // State B
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(true.B)
-        dut.io.addr.expect(OSPOTENTIAL.U)
+        dut.io.addr.sel.expect(dynamic)
+        dut.io.addr.pos.expect(TMNEURONS.U)
         dut.io.done.expect(false.B)
         for (i <- 0 until EVALUNITS)
           dut.io.cntrSels(i).writeDataSel.expect(1.U)
@@ -186,7 +196,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 4
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSWEIGHT.U)
+        dut.io.addr.sel.expect(weights)
+        dut.io.addr.pos.expect(0.U)
         dut.io.aEna.expect(true.B)
         for (i <- 0 until EVALUNITS) {
           if (refrac(i)) {
@@ -199,7 +210,8 @@ class ControlUnitTester extends FlatSpec with ChiselScalatestTester {
         // State 5 - 3 times over
         dut.io.ena.expect(true.B)
         dut.io.wr.expect(false.B)
-        dut.io.addr.expect(OSWEIGHT.U)
+        dut.io.addr.sel.expect(weights)
+        dut.io.addr.pos.expect(0.U)
         dut.io.aEna.expect(true.B)
         for (i <- 0 until EVALUNITS) {
           if (refrac(i)) 

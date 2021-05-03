@@ -2,6 +2,7 @@ package neuroproc
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.{annotate, ChiselAnnotation}
 
 class NeuromorphicProcessor(synth: Boolean = false) extends Module{
   val io = IO(new Bundle{
@@ -11,6 +12,11 @@ class NeuromorphicProcessor(synth: Boolean = false) extends Module{
 
   val clkEn  = Wire(Bool())
   val newTS = Wire(Bool())
+  Seq(clkEn, newTS).foreach { sig =>
+    annotate(new ChiselAnnotation {
+      override def toFirrtl = firrtl.AttributeAnnotation(sig.toTarget, "dont_touch = \"yes\"")
+    })
+  }
 
   // Global clock gating
   val resCnt = 50.U

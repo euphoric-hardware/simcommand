@@ -152,7 +152,3 @@ class InputCore(coreID: Int) extends Module {
     spikeTrans.io.spikes(i) := spikePulse(i)
   }
 }
-
-object InputCore extends App {
-  (new chisel3.stage.ChiselStage).emitVerilog(new InputCore(0), Array("--target-dir", "build"))
-}

@@ -34,7 +34,7 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester {
   }
 
   if (!RANKORDERENC) {
-    it should "process an image" in {
+    it should "process an image" taggedAs(SlowTest) in {
       test(new NeuromorphicProcessor())
         .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
         dut =>
