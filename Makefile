@@ -5,8 +5,10 @@ SBT := sbt
 all : proc vivado
 
 proc :
-	$(SBT) "runMain MakeDataFiles mapping/networkData.json"
+	python mapping/convert.py mapping/networkData.json
+	$(SBT) "runMain MakeDataFiles mapping/networkData_fp.json"
 	$(SBT) "runMain neuroproc.NeuromorphicProcessor"
+	python mapping/synthesis.py
 
 vivado :
 	./mapping/gentcl.sh

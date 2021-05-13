@@ -39,11 +39,9 @@ begin
 
     stimuli : process is
         file image   : text open read_mode is "image.txt";
-        file results : text open read_mode is "results.txt";
         variable L   : line;
         variable val : integer;
         variable index, rxRate : std_logic_vector(15 downto 0);
-        variable txByte : std_logic_vector(7 downto 0);
 
         procedure skip_sep is
             variable c : character;
@@ -75,26 +73,12 @@ begin
             uartRx <= '1';
             wait for BITDELAY;
         end;
-
-        procedure rec_byte is
-        begin
-            -- Expected the start bit to have been received already
-            wait for BITDELAY;
-            for i in 0 to 7 loop
-                txByte(i) := uartTx;
-                wait for BITDELAY;
-            end loop;
-
-            -- Receive stop bit
-            assert uartTx = '1'
-                report "stop bit not received"
-                severity failure;
-        end;
     begin
 
         -- Reset the accelerator
-        reset  <= '0';
+        reset  <= '1';
         uartRx <= '1';
+        wait for 10*T_clk;
         wait until falling_edge(sysclk_p);
         reset  <= '0';
         wait for T_clk;
@@ -117,23 +101,67 @@ begin
             trans_byte(rxRate(15 downto 8));
             trans_byte(rxRate( 7 downto 0));
         end loop inp;
-
-        -- Read out spikes and verify according to results file
-        readline(results, L);
-        outp : while timeCount < 1 sec loop
-            if uartTx = '0' then
-                rec_byte;
-                val := read_integer;
-                assert txByte = std_logic_vector(to_unsigned(val, 8))
-                    report "expected spike " & integer'image(val) & " but got " & integer'image(to_integer(unsigned(txByte)))
-                    severity failure;
-            end if;
-            wait for T_clk;
-        end loop outp;
-
+        report "Done inputting rates. Phase changed." severity note;
+        
+        -- Wait for the response and end simulation when done
+        timeCount := 0 sec;
+        wait for 500 ms;
         std.env.stop(0); -- replace with std.env.finish;
 
     end process stimuli;
+    
+    response : process is
+        file results : text open read_mode is "results_round.txt";
+        variable L   : line;
+        variable val : integer;
+        variable txByte : std_logic_vector(7 downto 0);
+        
+        procedure skip_sep is
+            variable c : character;
+        begin
+            read(L, c);
+        end;
+        
+        impure function read_integer return integer is
+            variable rV : integer;
+        begin
+            read(L, rV);
+            skip_sep;
+            return rV;
+        end;
+        
+        procedure rec_byte is
+        begin
+            -- Go to middle of transmitted bit
+            wait for BITDELAY / 2;
+            -- Expected the start bit to have been received already
+            wait for BITDELAY;
+            for i in 0 to 7 loop
+                txByte(i) := uartTx;
+                wait for BITDELAY;
+            end loop;
+            
+            -- Receive stop bit
+            assert uartTx = '1'
+                report "stop bit not received"
+                severity note;
+        end;
+    begin
+        -- Read out spikes and verify according to results file
+        readline(results, L);
+        outp : while timeCount < 500 ms loop
+            if uartTx = '0' then
+                rec_byte;
+                if (to_integer(unsigned(txByte)) < 200) then
+                    val := read_integer;
+                    assert txByte = std_logic_vector(to_unsigned(val, 8))
+                        report "expected spike " & integer'image(val) & " but got " & integer'image(to_integer(unsigned(txByte)))
+                        severity note;
+                end if;
+            end if;
+            wait for T_clk;
+        end loop outp;
+    end process response;
 
     clk : process is
     begin

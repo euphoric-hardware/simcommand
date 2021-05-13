@@ -42,7 +42,10 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester {
         
           // Reference image and results
           val image = fetch("./src/test/scala/neuroproc/systemtests/image.txt")
-          val results = fetch("./src/test/scala/neuroproc/systemtests/results.txt")
+          val results = if (USEROUNDEDWGHTS) 
+            fetch("./src/test/scala/neuroproc/systemtests/results_round.txt")
+          else
+            fetch("./src/test/scala/neuroproc/systemtests/results_toInt.txt")
         
           def receiveByte(byte: UInt) = {
             // Start bit

@@ -28,6 +28,7 @@ package object neuroproc {
   val RATEADDRWIDTH    = log2Up(NEURONSPRCORE)
   val INPUTSIZE        = 22*22
   val RANKORDERENC     = false
+  val USEROUNDEDWGHTS  = true
 
   // Hardcoded - consider changing to be part of conf files or similar
   val neuronsInCore = Array(256, 228, 200, 200, 200) // Neurons mapped to each core, in/outcores don't matter as they are used controlunit in neuron core

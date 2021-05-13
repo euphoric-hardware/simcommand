@@ -21,10 +21,10 @@ class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false)
   //  dynamic    |  refrac counters and membrane potentials
   //  biasthresh |  biases and thresholds
   //  weights    |  weights
-  val constmem = SyncReadMem(4, SInt(NEUDATAWIDTH.W))
+  val constmem = SyncReadMem(4, UInt(5.W))
   val dynamem  = SyncReadMem(2*TMNEURONS, SInt(NEUDATAWIDTH.W))
   val btmem    = SyncReadMem(2*TMNEURONS, SInt(NEUDATAWIDTH.W))
-  val wghtmem  = SyncReadMem((512+256)*TMNEURONS, SInt(NEUDATAWIDTH.W))
+  val wghtmem  = SyncReadMem((512+256)*TMNEURONS, UInt(11.W))
 
   // Memory initialization
   val fileType = MemoryLoadFileType.Binary
@@ -49,15 +49,11 @@ class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false)
 
   // Control synchronous memories
   val selPipe   = RegEnable(io.addr.sel, io.ena)
-  //val constRead = WireDefault(0.S(NEUDATAWIDTH.W))
-  //val dynaRead  = WireDefault(0.S(NEUDATAWIDTH.W))
-  //val btRead    = WireDefault(0.S(NEUDATAWIDTH.W))
-  //val wghtRead  = WireDefault(0.S(NEUDATAWIDTH.W))
-  //val memRead   = WireDefault(0.S(NEUDATAWIDTH.W))
-  val constRead = WireDefault(SInt(NEUDATAWIDTH.W), DontCare)
+  val addrPipe  = RegEnable(io.addr.pos(1, 0), io.ena)
+  val constRead = WireDefault(UInt(5.W), DontCare)
   val dynaRead  = WireDefault(SInt(NEUDATAWIDTH.W), DontCare)
   val btRead    = WireDefault(SInt(NEUDATAWIDTH.W), DontCare)
-  val wghtRead  = WireDefault(SInt(NEUDATAWIDTH.W), DontCare)
+  val wghtRead  = WireDefault(UInt(11.W), DontCare)
   val memRead   = WireDefault(SInt(NEUDATAWIDTH.W), DontCare)
   when(io.ena) {
     switch(io.addr.sel) {
@@ -75,13 +71,20 @@ class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false)
         btRead := btmem(io.addr.pos)
       }
       is(weights) {
-        wghtRead := wghtmem(io.addr.pos)
+        // Add an unused write port to force width of memory
+        when(io.wr) {
+          wghtmem(io.addr.pos) := io.writeData(10, 0)
+        }.otherwise {
+          wghtRead := wghtmem(io.addr.pos)
+        }
       }
     }
   }
   switch(selPipe) {
     is(const) {
-      memRead := constRead
+      val res = (constRead ## 0.U(10.W)).asSInt.pad(NEUDATAWIDTH) // Sign-extend
+      val oth = constRead.pad(NEUDATAWIDTH).asSInt                // Pad with zeros
+      memRead := Mux(!addrPipe.orR, res, oth)
     }
     is(dynamic) {
       memRead := dynaRead
@@ -90,7 +93,10 @@ class EvaluationMemory(val coreID: Int, val evalID: Int, synth: Boolean = false)
       memRead := btRead
     }
     is(weights) {
-      memRead := wghtRead
+      // Convert from 6.4
+      val res = (wghtRead(wghtRead.getWidth-2, 0) ## 0.U(6.W)).asSInt.pad(NEUDATAWIDTH)
+      val oth = wghtRead.pad(NEUDATAWIDTH).asSInt                 // Convert from 0.10
+      memRead := Mux(wghtRead(wghtRead.getWidth-1), res, oth)
     }
   }
   io.readData := memRead

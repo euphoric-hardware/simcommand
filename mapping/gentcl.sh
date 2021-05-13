@@ -20,10 +20,11 @@ for f in "mapping/meminit"/*.mem; do
     echo "add_files -norecurse \${path}$f" >> $FILE
 done
 echo "\nadd_files -norecurse -fileset constrs_1 \${path}resources/neuroConstraints.xdc\n" >> $FILE
-echo "add_files -norecurse -fileset sim_1 \${path}resources/neuroproc_tb.vhd\n" >> $FILE
-echo "add_files -norecurse -fileset sim_1 \${path}src/test/scala/systemtests/image.txt" >> $FILE
-echo "add_files -norecurse -fileset sim_1 \${path}src/test/scala/systemtests/results.txt\n" >> $FILE
-echo "# Launch synthesis and implementation
+echo "add_files -norecurse -fileset sim_1 \${path}resources/neuroproc_tb.vhd" >> $FILE
+for f in "src/test/scala/neuroproc/systemtests"/*.txt; do
+    echo "add_files -norecurse -fileset sim_1 \${path}$f" >> $FILE
+done
+echo "\n# Launch synthesis and implementation
 launch_runs -jobs $JOBS synth_1
 wait_on_run synth_1
 

@@ -20,12 +20,17 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 11
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
 
     - name: Compile
       run: sbt compile
     
     - name: Create memory initialization
-      run: sbt "runMain MakeDataFiles mapping/networkData.json"
+      run: python mapping/convert.py mapping/networkData.json
+      run: sbt "runMain MakeDataFiles mapping/networkData_fp.json"
 
     - name: Unit Tests
       run: sbt "testOnly neuroproc.unittests.** -- -l neuroproc.unittests.SlowTest"
