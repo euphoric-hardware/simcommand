@@ -27,9 +27,11 @@ jobs:
 
     - name: Compile
       run: sbt compile
+
+    - name: Convert weights to floats
+      run: python mapping/convert.py mapping/networkData.json
     
     - name: Create memory initialization
-      run: python mapping/convert.py mapping/networkData.json
       run: sbt "runMain MakeDataFiles mapping/networkData_fp.json"
 
     - name: Unit Tests
