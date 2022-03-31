@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "neuromorphic-proc-testbench"
+version = "0.1.0"
+description = ""
+authors = []
+# readme = "README.md"
+packages = [
+    {include = "testbench"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+cocotb = "1.6.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

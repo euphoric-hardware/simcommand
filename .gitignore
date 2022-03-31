@@ -15,3 +15,10 @@ netwkdev/smnist*
 netwkdev/pretrained*
 netwkdev/kwsonsnn/__pycache__*
 domaintest*
+
+mapping/meminit
+mapping/networkData_fp.json
+cocotb/testbench/sim_build
+__pycache__
+*.vcd
+results.xml

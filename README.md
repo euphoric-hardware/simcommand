@@ -1,4 +1,20 @@
 # NeuromorphicProcessor
+- 1655 seconds, 53455000 cycles = 32.3 kHz
+
+- cocotb caveats
+    - Use timescale 1ps/1ps on top of NP.sv to match chiseltest, use 2ps period clock
+    - Remove @(*) after always_latch in ClockBufferBB (event sensitivity lists are automatically inferred)
+    - Add iverilog vcd dumping to NP.sv
+```
+`ifdef COCOTB_SIM
+initial begin
+  $dumpfile ("NeuromorphicProcessor.vcd");
+  $dumpvars (0, NeuromorphicProcessor);
+  #1;
+end
+`endif
+```
+
 [![Actions Status](https://github.com/hansemandse/KWSonSNN/actions/workflows/ci.yml/badge.svg)](https://github.com/hansemandse/KWSonSNN/actions)
 Neuromorphic processor implementation for Master thesis - WIP!
 
