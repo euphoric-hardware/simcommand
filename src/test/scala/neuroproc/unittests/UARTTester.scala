@@ -4,8 +4,6 @@ import neuroproc._
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import org.scalatest._
 
 // Inspired by https://github.com/schoeberl/chisel-examples/blob/master/src/test/scala/uart/UartTester.scala

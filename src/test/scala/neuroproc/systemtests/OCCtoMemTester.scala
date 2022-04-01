@@ -4,10 +4,8 @@ import neuroproc._
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.experimental.UncheckedClockPoke._
 import chiseltest.experimental.UncheckedClockPeek._
-import chiseltest.internal.WriteVcdAnnotation
 import org.scalatest._
 
 class OCCtoMemTester extends FlatSpec with ChiselScalatestTester {

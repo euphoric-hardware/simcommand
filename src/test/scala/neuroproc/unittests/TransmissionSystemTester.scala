@@ -5,8 +5,6 @@ import neuroproc._
 import chisel3._
 import chisel3.util._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import org.scalatest._
 
 class TransmissionSystemTester extends FlatSpec with ChiselScalatestTester {

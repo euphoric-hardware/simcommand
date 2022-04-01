@@ -4,8 +4,6 @@ import neuroproc._
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import org.scalatest._
 import java.io.{FileNotFoundException, IOException}
 
@@ -36,7 +34,7 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester {
   if (!RANKORDERENC) {
     it should "process an image" taggedAs(SlowTest) in {
       test(new NeuromorphicProcessor())
-        .withAnnotations(Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)) {
+        .withAnnotations(Seq(VerilatorBackendAnnotation)) {
         dut =>
           dut.clock.setTimeout(FREQ)
         
