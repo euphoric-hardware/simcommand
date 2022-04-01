@@ -1,16 +1,17 @@
-scalaVersion := "2.12.12"
+scalaVersion := "2.12.15"
 
-scalacOptions := Seq("-Xsource:2.11", "-deprecation")
-
-resolvers ++= Seq(
-  Resolver.sonatypeRepo("snapshots"),
-  Resolver.sonatypeRepo("releases")
+scalacOptions := Seq(
+  "-language:reflectiveCalls",
+  "-deprecation",
+  "-feature",
+  "-Xcheckinit",
+  "-P:chiselplugin:genBundleElements",
 )
 
-addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.4.3" cross CrossVersion.full)
+addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.5.2" cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
-  "edu.berkeley.cs" %% "chisel3" % "3.4.3",
-  "edu.berkeley.cs" %% "chiseltest" % "0.3.3",
+  "edu.berkeley.cs" %% "chisel3" % "3.5.2",
+  "edu.berkeley.cs" %% "chiseltest" % "0.5.2",
   "io.spray" %%  "spray-json" % "1.3.5"
 )

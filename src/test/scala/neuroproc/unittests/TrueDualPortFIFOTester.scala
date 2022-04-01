@@ -5,10 +5,8 @@ import neuroproc._
 import chisel3._
 import chisel3.util._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.experimental.UncheckedClockPoke._
 import chiseltest.experimental.UncheckedClockPeek._
-import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import org.scalatest._
 
 class TrueDualPortFIFOTester extends FlatSpec with ChiselScalatestTester {

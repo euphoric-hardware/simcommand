@@ -25,7 +25,10 @@ class TrueDualPortMemoryIO(val addrW: Int, val dataW: Int) extends Bundle {
 
 class TrueDualPortMemory(addrW: Int, dataW: Int) extends RawModule {
   val io = IO(new TrueDualPortMemoryIO(addrW, dataW))
-  val ram = SyncReadMem(1 << addrW, UInt(dataW.W))
+
+  val ram = withClock(io.clka) {
+    SyncReadMem(1 << addrW, UInt(dataW.W))
+  }
 
   // Port a
   withClock(io.clka) {
