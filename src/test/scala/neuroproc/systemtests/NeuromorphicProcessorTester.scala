@@ -48,36 +48,7 @@ class NeuromorphicProcessorTester extends FlatSpec with ChiselScalatestTester {
             fetch("./src/test/scala/neuroproc/systemtests/results_round.txt")
           else
             fetch("./src/test/scala/neuroproc/systemtests/results_toInt.txt")
-        
-          def receiveByte(byte: UInt): Unit = {
-            // Start bit
-            dut.io.uartRx.poke(false.B)
-            dut.clock.step(bitDelay)
-            // Byte
-            for (i <- 0 until 8) {
-              dut.io.uartRx.poke(byte(i))
-              dut.clock.step(bitDelay)
-            }
-            // Stop bit
-            dut.io.uartRx.poke(true.B)
-            dut.clock.step(bitDelay)
-          }
-        
-          def transferByte(): Int = {
-            var byte = 0
-            // Assumes start bit has already been seen
-            dut.clock.step(bitDelay)
-            // Byte
-            for (i <- 0 until 8) {
-              byte = (dut.io.uartTx.peek.litToBoolean << i) | byte
-              dut.clock.step(bitDelay)
-            }
-            // Stop bit
-            dut.io.uartTx.expect(true.B)
-            //dut.clock.step(bitDelay)
-            byte
-          }
-        
+
           // Reset inputs
           dut.io.uartRx.poke(true.B)
           dut.io.uartTx.expect(true.B)
