@@ -34,16 +34,20 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
-  "receiveByte" should "receive the bytes sent by the UART" in {
-    test(new UARTMock(Seq(0x55, 0xff), 4)) { c =>
+  "receiveByte" should "receive a single byte sent by the UART" in {
+    test(new UARTMock(Seq(0x55), 4)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val bytesReceived = Command.run(cmds.receiveByte(4), c.clock, print = true)
-      print(bytesReceived)
+      val byteReceived = Command.run(cmds.receiveByte(4), c.clock, print = true)
+      assert(byteReceived == 0x55)
     }
   }
-  /*
-  val mockUartTx = new SignalListImpl(Map("io_uartTx" -> byteToPerCycleBits(4, 0x55)))
-  assert(uartRetVal == 0x55)
 
-   */
+  "receiveBytes" should "receive multiple bytes sent by the UART" in {
+    test(new UARTMock(Seq(0x55, 0xff, 0x00, 0xaa), 4)) { c =>
+      val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
+      val bytesReceived = Command.run(cmds.receiveBytes(4, 4), c.clock, print = true)
+      print(bytesReceived)
+      assert(bytesReceived == Seq(0x55, 0xff, 0x00, 0xaa))
+    }
+  }
 }

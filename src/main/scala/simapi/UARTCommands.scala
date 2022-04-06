@@ -35,7 +35,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
     if (bitsToGo == 0)
       Return(Unit)
     else
-      Concat(sendBit(byte & 0x1, bitDelay), _ => sendByteInner(bitDelay, byte >> 1, bitsToGo - 1))
+      Concat(sendBit(byte & 0x1, bitDelay), (_: Unit) => sendByteInner(bitDelay, byte >> 1, bitsToGo - 1))
   }
 
   def sendByte(bitDelay: Int, byte: Int): Command[Unit] = {
@@ -60,11 +60,28 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
     return byte
    */
 
+  def receiveBytes(bitDelay: Int, nBytes: Int): Command[Seq[Int]] = {
+    def receiveBytesInner(bitDelay: Int, nBytes: Int, seenSoFar: Seq[Int]): Command[Seq[Int]] = {
+      if (nBytes == 0)
+        Return(seenSoFar)
+      else {
+        Concat(receiveByte(bitDelay), (byte: Int) =>
+          receiveBytesInner(bitDelay, nBytes-1, seenSoFar :+  byte)
+        )
+      }
+    }
+    receiveBytesInner(bitDelay, nBytes, Seq.empty[Int])
+  }
+
   // @tailrec - also not tail recursive
   def receiveByte(bitDelay: Int): Command[Int] = {
     Peek(uartOut, (txBit: Bool) =>
       if (txBit.litValue == 0) Step(bitDelay / 2, () => // start bit is seen, shift time to center-of-symbol
-        Concat(receiveByteInner(bitDelay), byte => Return(byte))
+        Concat(receiveByteInner(bitDelay), (byte: Int) =>
+          Step(bitDelay + bitDelay / 2, () => // advance time past 1/2 of last bit and stop bit
+            Return(byte)
+          )
+        )
       ) else Step(1, () => receiveByte(bitDelay)) // UART line is still high, check on next cycle
     )
   }
@@ -72,7 +89,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   def receiveByteInner(bitDelay: Int, byte: Int = 0, nBits: Int = 8): Command[Int] = {
     if (nBits == 0) Return(byte)
     else {
-      Concat(receiveBit(bitDelay), bit =>
+      Concat(receiveBit(bitDelay), (bit: Int) =>
         receiveByteInner(bitDelay, byte | (bit << (8 - nBits)), nBits - 1))
     }
   }

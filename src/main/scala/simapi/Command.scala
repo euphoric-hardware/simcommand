@@ -9,7 +9,7 @@ sealed trait Command[R] {
 case class Step[R](cycles: Int, next: () => Command[R]) extends Command[R]
 case class Poke[R, I <: Data](signal: I, value: I, next: () => Command[R]) extends Command[R]
 case class Peek[R, I <: Data](signal: I, next: I => Command[R]) extends Command[R]
-case class Concat[R](a: Command[R], next: R => Command[R]) extends Command[R]
+case class Concat[R1, R2](a: Command[R1], next: R1 => Command[R2]) extends Command[R2]
 case class Return[R](retval: R) extends Command[R]
 case class Fork[R1, R2](c: Command[R1], next: () => Command[R2]) extends Command[R2]
 // case class Join[R1, R2](c: Fork[R1, _], next: R1 => Command[R2]) extends Command[R2]
