@@ -42,7 +42,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   "receiveBytes" should "receive multiple bytes sent by the UART" in {
-    val testBytes = Seq(0x55, 0xff) // 0x00, 0xaa
+    val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
     test(new UARTMock(testBytes, 4)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
       val bytesReceived = Command.run(cmds.receiveBytes(4, testBytes.length), c.clock, print = true)

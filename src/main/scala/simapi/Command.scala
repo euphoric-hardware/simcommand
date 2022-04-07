@@ -52,14 +52,17 @@ object Command {
     val ec = EC(clock, mutable.Buffer(ThreadData(cmd, "MAIN")))
     val cfg = InterpreterCfg(print)
     while (true) { // loop until main thread ends
+      // Go through all threads and run them until they hit a sync state
+      /*
+
+       */
+      // Collect the new threads and evaluate them too
+      //val newThreads = iteration.map(_.3)
+
+      //ec.threads.append(newThreads:_*)
+      //t.copy(cmd=Step(cycles - 1, () => nextCmd))
       //while (true) { // loop per step
         /*
-        val iteration = ec.threads.map { t =>
-          val (nextCmd, cycles, newThreads) = runUntilSync(t, cfg, Seq.empty)
-          ec.threads.append(newThreads:_*)
-          t.copy(cmd=Step(cycles - 1, () => nextCmd))
-          //(nextCmd, cycles, newThreads)
-        }
         clock.step(iteration.head._2)
          */
       //}
@@ -78,6 +81,32 @@ object Command {
     ???
   }
 
+  def runThreadsUntilSync(threads: Seq[ThreadData], time: Int, cfg: InterpreterCfg): Seq[ThreadData] = {
+    val iteration = threads.map { t =>
+      val (nextCmd, cycles, newThreads) = runUntilSync(t, time, cfg, Seq.empty)
+      Predef.assert(cycles == 1 || cycles == 0)
+      (nextCmd, cycles, newThreads)
+    }
+    if (iteration.map(_._3.length).sum == 0) { // no new threads spawned, we're done
+      threads.zipWithIndex.map { case (thread, i) =>
+        thread.copy(cmd=iteration(i)._1)
+      }
+    } else { // all the current threads are done, but they have spawned new threads
+      val existingThreads = threads.zipWithIndex.map { case (thread, i) =>
+        thread.copy(cmd=iteration(i)._1)
+      }
+      val newThreads = iteration.flatMap(_._3)
+      val newThreadsRun = runThreadsUntilSync(newThreads, time, cfg)
+      newThreadsRun.zipWithIndex.map {case (thread, i) =>
+        thread.copy(cmd=newThreadsRun(i)._1)
+      }
+
+    }
+
+
+  }
+
+
 
 
   // @tailrec
@@ -89,6 +118,13 @@ object Command {
         runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads :+ ThreadData(c, "child"))
       case Step(cycles, next) =>
         if (cfg.print) println(s"[runUntilSync] [Step] Stepping $cycles cycles from ${thread.name}")
+        if (cycles == 0) { // this Step is a nop
+          runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads)
+        } else if (cycles == 1) { // this Step will complete in 1 more cycle
+          (next(), 1, newThreads)
+        } else { // this Step requires 2 or more cycles to complete
+          (Step(cycles - 1, next), 1, newThreads)
+        }
         (next(), cycles, newThreads)
       case Poke(signal, value, next) =>
         if (cfg.print) println(s"[runUntilSync] [Poke] Poking $signal = $value from ${thread.name} at time $time")
