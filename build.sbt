@@ -15,3 +15,5 @@ libraryDependencies ++= Seq(
   "edu.berkeley.cs" %% "chiseltest" % "0.5.2",
   "io.spray" %%  "spray-json" % "1.3.5"
 )
+
+fork in run := true

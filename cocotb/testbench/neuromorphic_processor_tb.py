@@ -66,6 +66,7 @@ async def neuromorphic_processor_tb(dut):
     image = fetch("../../src/test/scala/neuroproc/systemtests/image.txt")
     results = fetch("../../src/test/scala/neuroproc/systemtests/results_round.txt") if (USEROUNDEDWGHTS) else fetch("../..//src/test/scala/neuroproc/systemtests/results_toInt.txt")
 
+    # Clock is generated inside Python
     cocotb.start_soon(Clock(dut.clock, 2, units="ps").start())
     await ClockCycles(dut.clock, 2)
 

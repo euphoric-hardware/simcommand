@@ -66,7 +66,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
         Return(seenSoFar)
       else {
         Concat(receiveByte(bitDelay), (byte: Int) =>
-          receiveBytesInner(bitDelay, nBytes-1, seenSoFar :+  byte)
+          receiveBytesInner(bitDelay, nBytes-1, seenSoFar :+ byte)
         )
       }
     }
@@ -76,19 +76,22 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   // @tailrec - also not tail recursive
   def receiveByte(bitDelay: Int): Command[Int] = {
     Peek(uartOut, (txBit: Bool) =>
-      if (txBit.litValue == 0) Step(bitDelay / 2, () => // start bit is seen, shift time to center-of-symbol
-        Concat(receiveByteInner(bitDelay), (byte: Int) =>
-          Step(bitDelay + bitDelay / 2, () => // advance time past 1/2 of last bit and stop bit
-            Return(byte)
-          )
+      if (txBit.litValue == 0)
+        Step(bitDelay / 2, () => // start bit is seen, shift time to center-of-symbol
+          Concat(receiveByteInner(bitDelay), (byte: Int) =>
+            Step(bitDelay + bitDelay / 2, () => // advance time past 1/2 of last bit and stop bit
+              Return(byte)
+            )
         )
       ) else Step(1, () => receiveByte(bitDelay)) // UART line is still high, check on next cycle
     )
   }
 
   def receiveByteInner(bitDelay: Int, byte: Int = 0, nBits: Int = 8): Command[Int] = {
-    if (nBits == 0) Return(byte)
-    else {
+    if (nBits == 0) {
+      // println(s"[receiveByteInner] returning $byte")
+      Return(byte)
+    } else {
       Concat(receiveBit(bitDelay), (bit: Int) =>
         receiveByteInner(bitDelay, byte | (bit << (8 - nBits)), nBits - 1))
     }
@@ -97,7 +100,10 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   def receiveBit(bitDelay: Int): Command[Int] = {
     // Assuming that a start bit has already been seen and current time is at the midpoint of the start bit
     Step(bitDelay, () =>
-      Peek(uartOut, (b: Bool) => Return(b.litValue.toInt))
+      Peek(uartOut, (b: Bool) => {
+        // println(s"[receiveBit] returning $b")
+        Return(b.litValue.toInt)
+      })
     )
   }
 }

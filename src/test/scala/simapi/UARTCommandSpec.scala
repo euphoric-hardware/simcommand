@@ -1,7 +1,7 @@
 package simapi
 
 import chisel3._
-import chiseltest.ChiselScalatestTester
+import chiseltest.{ChiselScalatestTester, WriteVcdAnnotation}
 import chisel3.util.log2Ceil
 import org.scalatest.flatspec.AnyFlatSpec
 
@@ -33,7 +33,6 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
       Command.run(cmds.sendByte(10, 0x55), c.clock, print=true)
     }
   }
-
   "receiveByte" should "receive a single byte sent by the UART" in {
     test(new UARTMock(Seq(0x55), 4)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
@@ -43,11 +42,12 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   "receiveBytes" should "receive multiple bytes sent by the UART" in {
-    test(new UARTMock(Seq(0x55, 0xff, 0x00, 0xaa), 4)) { c =>
+    val testBytes = Seq(0x55, 0xff) // 0x00, 0xaa
+    test(new UARTMock(testBytes, 4)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val bytesReceived = Command.run(cmds.receiveBytes(4, 4), c.clock, print = true)
+      val bytesReceived = Command.run(cmds.receiveBytes(4, testBytes.length), c.clock, print = true)
       print(bytesReceived)
-      assert(bytesReceived == Seq(0x55, 0xff, 0x00, 0xaa))
+      assert(bytesReceived == testBytes)
     }
   }
 }
