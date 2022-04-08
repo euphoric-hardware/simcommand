@@ -34,7 +34,7 @@ class EC() {
 object Command {
   case class ThreadData(cmd: Command[_], name: String)
   case class InterpreterCfg(print: Boolean)
-  case class EC(clock: Clock, threads: mutable.Buffer[ThreadData]) {
+  case class EC(clock: Clock, threads: Seq[ThreadData]) {
     // def run[R](...)
     // decrement
     // for all threads, run until step, for all threads, step them together w/ the simulator
@@ -48,84 +48,79 @@ object Command {
   }
 
   private def runInner[R](cmd: Command[R], clock: Clock, print: Boolean): R = {
-    var time = 0
-    val ec = EC(clock, mutable.Buffer(ThreadData(cmd, "MAIN")))
     val cfg = InterpreterCfg(print)
-    while (true) { // loop until main thread ends
+    var time = 0
+    var ec = EC(clock, Seq(ThreadData(cmd, "MAIN")))
+    while (true) { // Until the main thread returns
       // Go through all threads and run them until they hit a sync state
+      // Do this recursively to handle new thread spawning on this timestep
+      val newThreadHandles = runThreadsUntilSync(ec.threads, time, cfg)
+
+      // If the main thread returns, we are done
+      assert(newThreadHandles.head.name == "MAIN")
+      val done = newThreadHandles.head match {
+        case ThreadData(Return(retval), name) => Some(retval)
+        case _ => None
+      }
+      if (done.isDefined) return done.get.asInstanceOf[R]
+
+      // Advance time by 1 cycle (TODO: do we need to know the cycle advancement for each thread?)
+      ec.clock.step(1)
+      time = time + 1
+
+      ec = ec.copy(threads=newThreadHandles)
+      // Single thread implementation
       /*
-
-       */
-      // Collect the new threads and evaluate them too
-      //val newThreads = iteration.map(_.3)
-
-      //ec.threads.append(newThreads:_*)
-      //t.copy(cmd=Step(cycles - 1, () => nextCmd))
-      //while (true) { // loop per step
-        /*
-        clock.step(iteration.head._2)
-         */
-      //}
-      // assume only one thread
-      val (nextCmd, cycles, newThreads) = runUntilSync(ec.threads.head, time, cfg, Seq.empty)
+      val (newThreadHandle, cycles, newThreads) = runUntilSync(ec.threads.head, time, cfg, Seq.empty)
       // println(s"[runInner] nextCmd: $nextCmd at time $time")
-      nextCmd match {
-        case Return(retval) => return retval.asInstanceOf[R]
+      newThreadHandle match {
+        case ThreadData(Return(retval), _) => return retval.asInstanceOf[R]
         case _ =>
           if (cfg.print) println(s"[runInner] Stepping $cycles cycles at time $time")
           clock.step(cycles)
           time = time + cycles
       }
-      ec.threads(0) = ec.threads(0).copy(cmd=nextCmd)
+      ec.threads(0) = newThreadHandle
+      */
     }
     ???
   }
-
   def runThreadsUntilSync(threads: Seq[ThreadData], time: Int, cfg: InterpreterCfg): Seq[ThreadData] = {
     val iteration = threads.map { t =>
-      val (nextCmd, cycles, newThreads) = runUntilSync(t, time, cfg, Seq.empty)
+      val (newThreadHandle, cycles, newThreads) = runUntilSync(t, time, cfg, Seq.empty)
+      //println(s"cycles: $cycles")
+      //println(s"newThreadHandle: $newThreadHandle")
       Predef.assert(cycles == 1 || cycles == 0)
-      (nextCmd, cycles, newThreads)
+      (newThreadHandle, cycles, newThreads)
     }
     if (iteration.map(_._3.length).sum == 0) { // no new threads spawned, we're done
-      threads.zipWithIndex.map { case (thread, i) =>
-        thread.copy(cmd=iteration(i)._1)
-      }
-    } else { // all the current threads are done, but they have spawned new threads
-      val existingThreads = threads.zipWithIndex.map { case (thread, i) =>
-        thread.copy(cmd=iteration(i)._1)
-      }
+      iteration.map(_._1)
+    } else { // all the current threads are done, but they have spawned new threads which need to be run until a syncpoint is hit
+      val existingThreads = iteration.map(_._1)
       val newThreads = iteration.flatMap(_._3)
       val newThreadsRun = runThreadsUntilSync(newThreads, time, cfg)
-      newThreadsRun.zipWithIndex.map {case (thread, i) =>
-        thread.copy(cmd=newThreadsRun(i)._1)
-      }
-
+      existingThreads ++ newThreadsRun
     }
-
-
   }
-
-
-
 
   // @tailrec
   // NO LONGER tail recursive due to Concat
-  private def runUntilSync(thread: ThreadData, time: Int, cfg: InterpreterCfg, newThreads: Seq[ThreadData]): (Command[_], Int, Seq[ThreadData]) = {
+  private def runUntilSync(thread: ThreadData, time: Int, cfg: InterpreterCfg, newThreads: Seq[ThreadData]): (ThreadData, Int, Seq[ThreadData]) = {
     thread.cmd match {
       case Fork(c, next) =>
         if (cfg.print) println(s"[runUntilSync] [Fork] Forking off thread from ${thread.name}")
         runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads :+ ThreadData(c, "child"))
       case Step(cycles, next) =>
-        if (cfg.print) println(s"[runUntilSync] [Step] Stepping $cycles cycles from ${thread.name}")
         if (cycles == 0) { // this Step is a nop
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 0 cycles (NOP) from ${thread.name}")
           runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads)
         } else if (cycles == 1) { // this Step will complete in 1 more cycle
-          (next(), 1, newThreads)
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name}")
+          (thread.copy(cmd=next()), 1, newThreads)
         } else { // this Step requires 2 or more cycles to complete
-          (Step(cycles - 1, next), 1, newThreads)
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name}")
+          (thread.copy(cmd=Step(cycles - 1, next)), 1, newThreads)
         }
-        (next(), cycles, newThreads)
       case Poke(signal, value, next) =>
         if (cfg.print) println(s"[runUntilSync] [Poke] Poking $signal = $value from ${thread.name} at time $time")
         signal.poke(value)
@@ -139,14 +134,14 @@ object Command {
         // if (cfg.print) println(s"[runUntilSync] [Concat] Got retval $retval from ${thread.name} at time $time")
         // retval will contain a Return() or a Command[_] from a pending step which means 'a' is not yet complete
         retval match {
-          case (Return(retval), 0, newTs) => // a is 'complete' so continue executing next
+          case (ThreadData(Return(retval), _), 0, newTs) => // a is 'complete' so continue executing next
             runUntilSync(thread.copy(cmd=next(retval)), time, cfg, newThreads ++ newTs)
-          case (c: Command[_], cycles, newTs) => // a has hit a step so we should save next in a new Concat
-            (Concat(c, next), cycles, newTs)
+          case (ThreadData(c: Command[_], _), cycles, newTs) => // a has hit a step so we should save next in a new Concat
+            (thread.copy(cmd=Concat(c, next)), cycles, newTs)
         }
       case Return(retval) =>
         if (cfg.print) println(s"[runUntilSync] [Return] Returning with value $retval from ${thread.name} at time $time")
-        (Return(retval), 0, newThreads)
+        (thread.copy(cmd=Return(retval)), 0, newThreads)
     }
   }
 }

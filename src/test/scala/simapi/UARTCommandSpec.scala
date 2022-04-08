@@ -33,6 +33,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
       Command.run(cmds.sendByte(10, 0x55), c.clock, print=true)
     }
   }
+
   "receiveByte" should "receive a single byte sent by the UART" in {
     test(new UARTMock(Seq(0x55), 4)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
