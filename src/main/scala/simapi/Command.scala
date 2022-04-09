@@ -62,10 +62,14 @@ object Command {
         case ThreadData(Return(retval), name) => Some(retval)
         case _ => None
       }
-      if (done.isDefined) return done.get.asInstanceOf[R]
+      if (done.isDefined) {
+        if (cfg.print) println(s"[runInner] Main thread returned at time $time with value $done.get")
+        return done.get.asInstanceOf[R]
+      }
 
       // Advance time by 1 cycle (TODO: do we need to know the cycle advancement for each thread?)
       ec.clock.step(1)
+      if (cfg.print) println(s"[runInner] Stepping 1 cycle at time $time")
       time = time + 1
 
       ec = ec.copy(threads=newThreadHandles)
@@ -108,17 +112,17 @@ object Command {
   private def runUntilSync(thread: ThreadData, time: Int, cfg: InterpreterCfg, newThreads: Seq[ThreadData]): (ThreadData, Int, Seq[ThreadData]) = {
     thread.cmd match {
       case Fork(c, next) =>
-        if (cfg.print) println(s"[runUntilSync] [Fork] Forking off thread from ${thread.name}")
+        if (cfg.print) println(s"[runUntilSync] [Fork] Forking off thread from ${thread.name} at time $time")
         runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads :+ ThreadData(c, "child"))
       case Step(cycles, next) =>
         if (cycles == 0) { // this Step is a nop
-          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 0 cycles (NOP) from ${thread.name}")
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 0 cycles (NOP) from ${thread.name} at time $time")
           runUntilSync(thread.copy(cmd=next()), time, cfg, newThreads)
         } else if (cycles == 1) { // this Step will complete in 1 more cycle
-          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name}")
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name} at time $time")
           (thread.copy(cmd=next()), 1, newThreads)
         } else { // this Step requires 2 or more cycles to complete
-          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name}")
+          if (cfg.print) println(s"[runUntilSync] [Step] Stepping 1 cycle from ${thread.name} at time $time")
           (thread.copy(cmd=Step(cycles - 1, next)), 1, newThreads)
         }
       case Poke(signal, value, next) =>

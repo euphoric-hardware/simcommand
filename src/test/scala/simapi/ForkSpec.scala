@@ -1,18 +1,19 @@
 package simapi
 
 import chisel3._
-import chiseltest.ChiselScalatestTester
+import chiseltest.{ChiselScalatestTester, WriteVcdAnnotation}
 import org.scalatest.flatspec.AnyFlatSpec
 
 class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   class ForkExample(a: UInt, b: UInt) {
     def increment(cycle: Int = 0): Command[Unit] = {
       if (cycle == 10) Return(Unit)
-      else Step(1, () =>
+      else
         Poke(b, cycle.U, () =>
-          increment(cycle + 1)
+          Step(1, () =>
+            increment(cycle + 1)
+          )
         )
-      )
     }
 
     def program(): Command[Unit] = {
@@ -30,7 +31,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   "Fork" should "create a thread that operates independently of the main thread" in {
-    test(new ForkModule()) { c =>
+    test(new ForkModule()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new ForkExample(c.a, c. b)
       Command.run(cmds.program(), c.clock, print=true)
     }
