@@ -31,7 +31,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
         Fork(increment(), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
           Fork(inspect(0, Seq.empty), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
             // TODO: join both threads and return result (TODO: have join_all - default and join_any functionality)
-            //Step(11, () => Return(())) // step on main thread
+            // Step(11, () => Return(())) // step on main thread
             Join(h2, (peeked: Seq[Int]) => Return(peeked))
           )
         )

@@ -31,48 +31,56 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     val rx = IO(Input(Bool()))
     val tx = IO(Output(Bool()))
 
-    tx := RegNext(rx)
+    tx := RegNext(rx, 1.B)
   }
 
   "sendByte" should "produce the right sequence" in {
-    test(new UARTMock(Seq.empty, 10)) { c =>
+    val testByte = 0x55
+    val bitDelay = 4
+    test(new UARTMock(Seq.empty, bitDelay)) { c =>
       val cmds = new UARTCommands(uartIn=c.rx, uartOut=c.tx)
-      Command.run(cmds.sendByte(10, 0x55), c.clock, print=false)
+      Command.run(cmds.sendByte(bitDelay, testByte), c.clock, print=false)
     }
+    // TODO: no checks can be run since sendByte only pokes
   }
 
   "receiveByte" should "receive a single byte sent by the UART" in {
-    test(new UARTMock(Seq(0x55), 4)) { c =>
+    val testByte = Seq(0x55)
+    val bitDelay = 4
+    test(new UARTMock(testByte, bitDelay)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val byteReceived = Command.run(cmds.receiveByte(4), c.clock, print=false)
-      assert(byteReceived == 0x55)
+      val byteReceived = Command.run(cmds.receiveByte(bitDelay), c.clock, print=false)
+      assert(byteReceived == testByte.head)
     }
   }
 
   "receiveBytes" should "receive multiple bytes sent by the UART" in {
     val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
-    test(new UARTMock(testBytes, 4)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    val bitDelay = 4
+    test(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val bytesReceived = Command.run(cmds.receiveBytes(4, testBytes.length), c.clock, print=false)
+      val bytesReceived = Command.run(cmds.receiveBytes(bitDelay, testBytes.length), c.clock, print=false)
       assert(bytesReceived == testBytes)
     }
   }
 
-  "sendBytes" should "successfully send bytes to a forked receiveBytes" in {
+  "sendBytes" should "successfully send bytes to a forked receiveBytes through a UART loopback" in {
     val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
-    test(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    test(new UARTLoopback()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val sender = cmds.sendBytes(bitDelay, testBytes)
+      val sender = Concat(cmds.sendReset(bitDelay), (_: Unit) => cmds.sendBytes(bitDelay, testBytes))
       val receiver = cmds.receiveBytes(bitDelay, testBytes.length)
-      val program = Fork(sender, "sender", (h1: ThreadHandle[Unit]) =>
-        Fork(receiver, "receiver", (h2: ThreadHandle[Seq[Int]]) =>
-          Step(bitDelay*10*(testBytes.length + 1), () => Return(()))
+      val program =
+        Fork(sender, "sender", (h1: ThreadHandle[Unit]) =>
+          Fork(receiver, "receiver", (h2: ThreadHandle[Seq[Int]]) =>
+            Step(bitDelay*cmds.bitsPerSymbol*(testBytes.length + 1), () =>
+              Join(h2, (retval: Seq[Int]) => Return(retval))
+            )
+          )
         )
-      )
-      val bytesReceived = Command.run(program, c.clock, print=true)
-      //print(bytesReceived)
-      //assert(bytesReceived == testBytes)
+      val bytesReceived = Command.run(program, c.clock, print=false)
+      assert(bytesReceived == testBytes)
     }
   }
 }

@@ -6,6 +6,7 @@ import chisel3.experimental.{DataMirror, Direction}
 class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   assert(DataMirror.directionOf(uartIn) == Direction.Input)
   assert(DataMirror.directionOf(uartOut) == Direction.Output)
+  val bitsPerSymbol = 10
   // sending a UART byte using cocotb
   /*
   async def receiveByte(dut, bitDelay: int, byte: int):
@@ -22,6 +23,13 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
     await ClockCycles(dut.clock, bitDelay)
     print("Sent byte {byte}")
   */
+  def sendReset(bitDelay: Int): Command[Unit] = {
+    // Keep idle high for an entire symbol period to reset any downstream receivers
+    Poke(uartIn, 1.B, () =>
+      Step(bitDelay * (bitsPerSymbol + 1), () => Return(()))
+    )
+  }
+
   def sendBit(bit: Int, bitDelay: Int): Command[Unit] = {
     Poke(uartIn, bit.B, () =>
       Step(bitDelay, () =>
@@ -39,7 +47,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   }
 
   def sendByte(bitDelay: Int, byte: Int): Command[Unit] = {
-    sendByteInner(bitDelay, ((byte & 0xff) << 1) | (1 << 10), 10)
+    sendByteInner(bitDelay, ((byte & 0xff) << 1) | (1 << bitsPerSymbol), bitsPerSymbol)
   }
 
   def sendBytes(bitDelay: Int, bytes: Seq[Int]): Command[Unit] = {

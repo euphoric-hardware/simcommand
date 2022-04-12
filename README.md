@@ -2,6 +2,12 @@
 - Chiseltest TB: 1655 seconds, 53455000 cycles = 32.3 kHz (with trace dump enabled, with Verilator v4.034)
 - Chiseltest TB (no dumping, Verilator v4.034, no threading annotation) = 142s = 376.4 kHz
 - Cocotb TB: 1367 seconds, 13.455 M cycles = 9.8 kHz (without trace dump, with Verilator v4.106, ONLY up to the image being sent - test failed with typeError when just starting to wait for response, verified cycle count matches between cocotb and chiseltest TBs)
+  - dynamic clock from python testbench
+  - peeking any signal in the design
+  - event driven - not clock step driven - can wait for arbitrary time points (e.g. falling edge of dynamic clock)
+- VCD replay in Verilator: ~ 1 MHz
+- VCS + SystemVerilog speed 
+  - see fault paper for examples (e.g. Commercial Tool 1, 2)
 
 - cocotb caveats
     - Use timescale 1ps/1ps on top of NP.sv to match chiseltest, use 2ps period clock

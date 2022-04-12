@@ -4,12 +4,12 @@ import neuroproc._
 import simapi._
 import chisel3._
 import chiseltest._
-import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
 import simapi.UARTCommands
 
 import java.io.{FileNotFoundException, IOException}
 
-class NeuromorphicProcessorCommandTester extends FlatSpec with ChiselScalatestTester {
+class NeuromorphicProcessorCommandTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "Neuromorphic Processor"
 
   val bitDelay = FREQ / BAUDRATE + 1
@@ -62,8 +62,8 @@ class NeuromorphicProcessorCommandTester extends FlatSpec with ChiselScalatestTe
         val bytes = image.indices.flatMap { i =>
           Seq((i >> 8) & 0xff, i & 0xff, (image(i) >> 8) & 0xff, image(i) & 0xff)
         }
-        val commands = new UARTCommands(dut.io.uartTx, dut.io.uartRx)
-        val receiver = commands.receiveBytes(bitDelay, 110)
+        val commands = new UARTCommands(dut.io.uartRx, dut.io.uartTx)
+        val receiver = commands.receiveBytes(bitDelay, 100)
         val sender = commands.sendBytes(bitDelay, bytes)
 
         val program: Command[Seq[Int]] =
