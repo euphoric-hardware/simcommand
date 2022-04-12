@@ -1,51 +1,69 @@
 package simapi
 
 import chisel3._
+import chisel3.util.{ShiftRegister, Valid}
 import chiseltest.{ChiselScalatestTester, WriteVcdAnnotation}
+import chisel3.experimental.BundleLiterals._
 import org.scalatest.flatspec.AnyFlatSpec
 
+
 class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
-  class ForkExample(b: UInt) {
-    def increment(cycle: Int = 0): Command[Unit] = {
-      if (cycle == 10) Return(Unit)
+  class ValidDelayLine extends Module {
+    val a = IO(Input(Valid(UInt(10.W))))
+    val b = IO(Output(Valid(UInt(10.W))))
+    val default = Wire(Valid(UInt(10.W)))
+    default.valid := false.B
+    default.bits := 0.U
+    b := ShiftRegister(a, 20, default, en=1.B)
+  }
+
+  class ForkExample(a: Valid[UInt], b: Valid[UInt], proto: Valid[UInt]) {
+    def poker(nElems: Int, cycles: Int = 0): Command[Unit] = {
+      if (cycles == nElems) {
+        Poke(a, proto.Lit(_.valid -> 0.B, _.bits -> 0.U), () =>
+          Return(Unit)
+        )
+      }
       else
-        Poke(b, cycle.U, () =>
+        Poke(a, proto.Lit(_.valid -> 1.B, _.bits -> cycles.U), () =>
           Step(1, () =>
-            increment(cycle + 1)
+            poker(nElems, cycles + 1)
           )
         )
     }
 
-    def inspect(cycle: Int = 0, values: Seq[Int]): Command[Seq[Int]] = {
-      if (cycle == 10) Return(values)
+    def peeker(nElems: Int, values: Seq[Int] = Seq.empty): Command[Seq[Int]] = {
+      if (values.length == nElems) Return(values)
       else
-        Peek(b, (value: UInt) =>
-          Step(1, () =>
-            inspect(cycle + 1, values :+ value.litValue.toInt)
-          )
+        Peek(b, (value: Valid[UInt]) =>
+          if (value.valid.litToBoolean) {
+            Step(1, () =>
+              peeker(nElems, values :+ value.bits.litValue.toInt)
+            )
+          } else {
+            Step(1, () => peeker(nElems, values))
+          }
         )
     }
 
     def program(): Command[Seq[Int]] = {
       Step(1, () =>
-        Fork(increment(), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
-          Fork(inspect(0, Seq.empty), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
-            // TODO: join both threads and return result (TODO: have join_all - default and join_any functionality)
-            // Step(11, () => Return(())) // step on main thread
-            Join(h2, (peeked: Seq[Int]) => Return(peeked))
+        Fork(peeker(nElems=10), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
+          Fork(poker(nElems=10), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
+            Join(h1, (_: Unit) =>
+              Join(h2, (peeked: Seq[Int]) =>
+                Return(peeked)
+              )
+            )
           )
         )
       )
     }
   }
 
-  class ForkModule extends Module {
-    val b = IO(Input(UInt(10.W)))
-  }
-
   "Fork" should "create a thread that operates independently of the main thread" in {
-    test(new ForkModule()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-      val cmds = new ForkExample(c.b)
+    test(new ValidDelayLine()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+      val cmds = new ForkExample(c.a, c.b, Valid(UInt(10.W)))
       val retval = Command.run(cmds.program(), c.clock, print=true)
       println(retval)
     }

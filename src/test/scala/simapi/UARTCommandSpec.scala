@@ -39,7 +39,11 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     val bitDelay = 4
     test(new UARTMock(Seq.empty, bitDelay)) { c =>
       val cmds = new UARTCommands(uartIn=c.rx, uartOut=c.tx)
-      Command.run(cmds.sendByte(bitDelay, testByte), c.clock, print=false)
+      val chkr = new UARTChecker(c.tx)
+      val program = Fork(chkr.check(bitDelay, 1), "checker", (h: ThreadHandle[Unit]) =>
+        Concat(cmds.sendByte(bitDelay, testByte), (_: Unit) => Step(bitDelay*5, () => Return(())))
+      )
+      Command.run(program, c.clock, print=false)
     }
     // TODO: no checks can be run since sendByte only pokes
   }
@@ -65,17 +69,27 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   "sendBytes" should "successfully send bytes to a forked receiveBytes through a UART loopback" in {
-    val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
+    val testBytes = Seq(0x00, 0x00, 0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
     test(new UARTLoopback()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
+      val rxChk = new UARTChecker(c.rx)
+      val txChk = new UARTChecker(c.tx)
+
       val sender = Concat(cmds.sendReset(bitDelay), (_: Unit) => cmds.sendBytes(bitDelay, testBytes))
       val receiver = cmds.receiveBytes(bitDelay, testBytes.length)
+      val rxChecker = rxChk.check(bitDelay, testBytes.length)
+      val txChecker = txChk.check(bitDelay, testBytes.length)
+
       val program =
         Fork(sender, "sender", (h1: ThreadHandle[Unit]) =>
           Fork(receiver, "receiver", (h2: ThreadHandle[Seq[Int]]) =>
-            Step(bitDelay*cmds.bitsPerSymbol*(testBytes.length + 1), () =>
-              Join(h2, (retval: Seq[Int]) => Return(retval))
+            Fork(rxChecker, "rxChecker", (h3: ThreadHandle[Unit]) =>
+              Fork(txChecker, "txChecker", (h4: ThreadHandle[Unit]) =>
+                Step(bitDelay*cmds.bitsPerSymbol*(testBytes.length + 1), () =>
+                  Join(h2, (retval: Seq[Int]) => Return(retval))
+                )
+              )
             )
           )
         )

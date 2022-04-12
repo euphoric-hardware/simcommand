@@ -8,6 +8,9 @@
 - VCD replay in Verilator: ~ 1 MHz
 - VCS + SystemVerilog speed 
   - see fault paper for examples (e.g. Commercial Tool 1, 2)
+- Command API, no optimizations
+  - 914s with trace dump enabled, Verilator v4.034
+  - 60 kHz (~6x faster than cocotb, ~2x faster than Chiseltest w/ threads, ~6x slower than Chiseltest w/ 'manual' threading)
 
 - cocotb caveats
     - Use timescale 1ps/1ps on top of NP.sv to match chiseltest, use 2ps period clock

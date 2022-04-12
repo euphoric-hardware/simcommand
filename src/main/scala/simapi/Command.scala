@@ -8,6 +8,7 @@ sealed trait Command[+R] {
   // public API speculation
   // def fork(next => Command[R2]): Command[R2]
   // def andThen[R2](next: => Command[R2]) = {}
+  // TODO: have join_all - default and join_any functionality
 }
 case class Step[R](cycles: Int, next: () => Command[R]) extends Command[R]
 case class Poke[R, I <: Data](signal: I, value: I, next: () => Command[R]) extends Command[R]
@@ -92,7 +93,7 @@ object Command {
       if (done.isDefined) {
         if (cfg.print) println(s"[runInner] Main thread returned at time $time with value ${done.get}")
         if (ec.threads.length > 1 && cfg.print) println(s"[runInner] Main thread returning while child threads ${ec.threads.tail} aren't yet done")
-        println(retVals)
+        // println(retVals)
         return done.get.asInstanceOf[R]
       }
 
@@ -156,7 +157,7 @@ object Command {
   private def runUntilSync(thread: ThreadData, time: Int, cfg: InterpreterCfg, newThreads: Seq[ThreadData], threadIdGen: ThreadIdGenerator): (ThreadData, Int, Seq[ThreadData]) = {
     thread.cmd match {
       case f @ Fork(c, name, next) =>
-        if (cfg.print) println(s"[runUntilSync] [Fork] Forking off thread from ${thread.name} at time $time")
+        if (cfg.print) println(s"[runUntilSync] [Fork] Forking off thread $name from ${thread.name} at time $time")
         val forkedThreadId = threadIdGen.getNewThreadId
         val forkedThreadHandle = f.makeThreadHandle(forkedThreadId)
         runUntilSync(thread.copy(cmd=next(forkedThreadHandle)), time, cfg, newThreads :+ ThreadData(c, name, forkedThreadId), threadIdGen)

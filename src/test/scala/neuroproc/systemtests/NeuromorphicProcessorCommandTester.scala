@@ -37,6 +37,7 @@ class NeuromorphicProcessorCommandTester extends AnyFlatSpec with ChiselScalates
     it should "process an image" taggedAs(SlowTest) in {
       val annos = Seq(
         VerilatorBackendAnnotation,
+        WriteVcdAnnotation,
         chiseltest.internal.NoThreadingAnnotation,
       )
 
@@ -63,12 +64,13 @@ class NeuromorphicProcessorCommandTester extends AnyFlatSpec with ChiselScalates
           Seq((i >> 8) & 0xff, i & 0xff, (image(i) >> 8) & 0xff, image(i) & 0xff)
         }
         val commands = new UARTCommands(dut.io.uartRx, dut.io.uartTx)
-        val receiver = commands.receiveBytes(bitDelay, 100)
+        val receiver = commands.receiveBytes(bitDelay, 110)
         val sender = commands.sendBytes(bitDelay, bytes)
 
         val program: Command[Seq[Int]] =
           Fork(receiver, "receiver", (r: ThreadHandle[Seq[Int]]) =>
-            Fork(sender, "sender", (s: ThreadHandle[Unit]) =>
+            Fork(sender, "sender", (s: ThreadHandle[Unit]) => {
+              println("Loading image into accelerator")
               Join(s, (_: Unit) => {
                 println("Done loading image")
                 println("getting accelerator's response") // Step(FREQ/2) used in original testbench
@@ -77,9 +79,8 @@ class NeuromorphicProcessorCommandTester extends AnyFlatSpec with ChiselScalates
                   Return(retval)
                 })
               })
-            )
+            })
           )
-        println("Loading image into accelerator")
         val retval = Command.run(program, dut.clock, print=false)
         val spikes = retval.filter(_ < 200)
         assert(spikes.length == results.length, "number of spikes does not match expected")
