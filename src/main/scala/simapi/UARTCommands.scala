@@ -25,7 +25,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   def sendBit(bit: Int, bitDelay: Int): Command[Unit] = {
     Poke(uartIn, bit.B, () =>
       Step(bitDelay, () =>
-        Return(Unit)
+        Return(())
       )
     )
   }
@@ -33,13 +33,27 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
   // @tailrec - NOT tail recursive - will blow up eventually, what is trampolining?
   private def sendByteInner(bitDelay: Int, byte: Int, bitsToGo: Int): Command[Unit] = {
     if (bitsToGo == 0)
-      Return(Unit)
+      Return(())
     else
       Concat(sendBit(byte & 0x1, bitDelay), (_: Unit) => sendByteInner(bitDelay, byte >> 1, bitsToGo - 1))
   }
 
   def sendByte(bitDelay: Int, byte: Int): Command[Unit] = {
     sendByteInner(bitDelay, ((byte & 0xff) << 1) | (1 << 10), 10)
+  }
+
+  def sendBytes(bitDelay: Int, bytes: Seq[Int]): Command[Unit] = {
+    val cmds: Seq[Unit => Command[Unit]] = bytes.map(b => (_: Unit) => sendByte(bitDelay, b))
+    Command.combine(cmds, ())
+    /*
+    if (bytes.isEmpty)
+      Return(Unit)
+    else {
+      Concat(sendByte(bitDelay, bytes.head), (_: Unit) =>
+        sendBytes(bitDelay, bytes.tail)
+      )
+    }
+     */
   }
 
   // receiving a UART byte using cocotb
@@ -87,7 +101,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool) {
     )
   }
 
-  def receiveByteInner(bitDelay: Int, byte: Int = 0, nBits: Int = 8): Command[Int] = {
+  private def receiveByteInner(bitDelay: Int, byte: Int = 0, nBits: Int = 8): Command[Int] = {
     if (nBits == 0) {
       // println(s"[receiveByteInner] returning $byte")
       Return(byte)

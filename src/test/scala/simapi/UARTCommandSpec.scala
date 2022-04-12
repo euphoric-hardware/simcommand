@@ -27,17 +27,24 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
+  class UARTLoopback() extends Module {
+    val rx = IO(Input(Bool()))
+    val tx = IO(Output(Bool()))
+
+    tx := RegNext(rx)
+  }
+
   "sendByte" should "produce the right sequence" in {
     test(new UARTMock(Seq.empty, 10)) { c =>
       val cmds = new UARTCommands(uartIn=c.rx, uartOut=c.tx)
-      Command.run(cmds.sendByte(10, 0x55), c.clock, print=true)
+      Command.run(cmds.sendByte(10, 0x55), c.clock, print=false)
     }
   }
 
   "receiveByte" should "receive a single byte sent by the UART" in {
     test(new UARTMock(Seq(0x55), 4)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val byteReceived = Command.run(cmds.receiveByte(4), c.clock, print = true)
+      val byteReceived = Command.run(cmds.receiveByte(4), c.clock, print=false)
       assert(byteReceived == 0x55)
     }
   }
@@ -46,9 +53,26 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
     test(new UARTMock(testBytes, 4)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
-      val bytesReceived = Command.run(cmds.receiveBytes(4, testBytes.length), c.clock, print = true)
-      print(bytesReceived)
+      val bytesReceived = Command.run(cmds.receiveBytes(4, testBytes.length), c.clock, print=false)
       assert(bytesReceived == testBytes)
+    }
+  }
+
+  "sendBytes" should "successfully send bytes to a forked receiveBytes" in {
+    val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
+    val bitDelay = 4
+    test(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+      val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx)
+      val sender = cmds.sendBytes(bitDelay, testBytes)
+      val receiver = cmds.receiveBytes(bitDelay, testBytes.length)
+      val program = Fork(sender, "sender", (h1: ThreadHandle[Unit]) =>
+        Fork(receiver, "receiver", (h2: ThreadHandle[Seq[Int]]) =>
+          Step(bitDelay*10*(testBytes.length + 1), () => Return(()))
+        )
+      )
+      val bytesReceived = Command.run(program, c.clock, print=true)
+      //print(bytesReceived)
+      //assert(bytesReceived == testBytes)
     }
   }
 }

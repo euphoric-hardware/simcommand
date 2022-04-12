@@ -26,11 +26,13 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
         )
     }
 
-    def program(): Command[Unit] = {
+    def program(): Command[Seq[Int]] = {
       Step(1, () =>
-        Fork(increment(), "poker", () => // fork off poking thread
-          Fork(inspect(0, Seq.empty), "peeker", () =>
-            Step(11, () => Return(Unit)) // step on main thread
+        Fork(increment(), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
+          Fork(inspect(0, Seq.empty), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
+            // TODO: join both threads and return result (TODO: have join_all - default and join_any functionality)
+            //Step(11, () => Return(())) // step on main thread
+            Join(h2, (peeked: Seq[Int]) => Return(peeked))
           )
         )
       )
@@ -44,7 +46,8 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   "Fork" should "create a thread that operates independently of the main thread" in {
     test(new ForkModule()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new ForkExample(c.b)
-      Command.run(cmds.program(), c.clock, print=true)
+      val retval = Command.run(cmds.program(), c.clock, print=true)
+      println(retval)
     }
   }
 }
