@@ -46,10 +46,10 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
         )
     }
 
-    def program(): Command[Seq[Int]] = {
+    def program(nElems: Int): Command[Seq[Int]] = {
       Step(1, () =>
-        Fork(peeker(nElems=10), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
-          Fork(poker(nElems=10), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
+        Fork(peeker(nElems), "peeker", (h2: ThreadHandle[Seq[Int]]) => // fork off peeking thread
+          Fork(poker(nElems), "poker", (h1: ThreadHandle[Unit]) => // fork off poking thread
             Join(h1, (_: Unit) =>
               Join(h2, (peeked: Seq[Int]) =>
                 Return(peeked)
@@ -64,8 +64,8 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   "Fork" should "create a thread that operates independently of the main thread" in {
     test(new ValidDelayLine()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new ForkExample(c.a, c.b, Valid(UInt(10.W)))
-      val retval = Command.run(cmds.program(), c.clock, print=true)
-      println(retval)
+      val retval = Command.run(cmds.program(10), c.clock, print=true)
+      Predef.assert(retval == Seq.tabulate(10)(i => i))
     }
   }
 }
