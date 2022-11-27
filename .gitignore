@@ -4,6 +4,8 @@
 .vscode*
 .idea*
 project/*
+!project/build.properties
+!project/plugins.sbt
 target/*
 *.hex
 *.mif
