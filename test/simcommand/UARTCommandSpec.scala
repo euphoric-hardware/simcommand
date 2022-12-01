@@ -1,6 +1,5 @@
 package simcommand
 
-import Command._
 import chisel3._
 import chiseltest.{testableClock, ChiselScalatestTester, WriteVcdAnnotation}
 import chisel3.util.log2Ceil
@@ -49,7 +48,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
         _ <- step(bitDelay*5)
         j <- join(checkerHandle)
       } yield j
-      val result = Command.unsafeRun(program, c.clock, print=false)
+      val result = unsafeRun(program, c.clock)
       assert(result.retval) // This only checks that the start and stop bits are stable and full
     } // TODO: need a check on the sending itself that doesn't depend on receiveByte
   }
@@ -59,7 +58,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     val bitDelay = 4
     test(new UARTMock(testByte, bitDelay)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
-      val result = Command.unsafeRun(cmds.receiveByte(), c.clock, print=false)
+      val result = unsafeRun(cmds.receiveByte(), c.clock)
       assert(result.retval == testByte.head)
     }
   }
@@ -69,7 +68,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     val bitDelay = 4
     test(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
-      val result = Command.unsafeRun(cmds.receiveBytes(testBytes.length), c.clock, print=false)
+      val result = unsafeRun(cmds.receiveBytes(testBytes.length), c.clock)
       assert(result.retval == testBytes)
     }
   }
@@ -102,7 +101,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
         _ <- join(senderThread)
       } yield (receivedBytes, rxCheckStatus && txCheckStatus)
 
-      val result = Command.unsafeRun(program, c.clock, print=false)
+      val result: Result[(Seq[Int], Boolean)] = unsafeRun(program, c.clock)
       assert(result.retval._1 == testBytes)
       assert(result.retval._2)
     }

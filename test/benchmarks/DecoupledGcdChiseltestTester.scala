@@ -12,8 +12,8 @@ import firrtl.stage.FirrtlCircuitAnnotation
 import firrtl.{AnnotationSeq, EmittedCircuitAnnotation}
 import logger.LogLevelAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
-import simcommand.Command.Command
-import simcommand.{Command, DecoupledCommands}
+
+import simcommand._
 
 class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "DecoupledGcd"
@@ -45,7 +45,7 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
       dut.output.initSink().setSinkClock(dut.clock)
       dut.clock.setTimeout(0)
 
-      fork {
+      chiseltest.fork {
         dut.input.enqueueSeq(inputBundles)
       }.fork {
         dut.output.expectDequeueSeq(outputBundles)
@@ -72,13 +72,13 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
       dut.clock.setTimeout(1000)
 
       val program: Command[Seq[GcdOutputBundle]] = for {
-        pushThread <- simcommand.Command.fork(inputCmds.enqueueSeq(inputBundles.toVector), "push")
-        pullThread <- simcommand.Command.fork(outputCmds.dequeueN(outputBundles.length),"pull")
-        _ <- simcommand.Command.join(pushThread)
-        output <- simcommand.Command.join(pullThread)
+        pushThread <- simcommand.fork(inputCmds.enqueueSeq(inputBundles.toVector), "push")
+        pullThread <- simcommand.fork(outputCmds.dequeueN(outputBundles.length),"pull")
+        _ <- join(pushThread)
+        output <- join(pullThread)
       } yield output
 
-      val result = Command.unsafeRun(program, dut.clock, false)
+      val result = unsafeRun(program, dut.clock)
       Predef.assert(result.retval.length == outputBundles.length)
       result.retval.zip(outputBundles).foreach { case (actual, gold) =>
         Predef.assert(actual.gcd.litValue == gold.gcd.litValue)

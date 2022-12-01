@@ -6,9 +6,6 @@ import chiseltest.{ChiselScalatestTester, WriteVcdAnnotation}
 import chisel3.experimental.BundleLiterals._
 import org.scalatest.flatspec.AnyFlatSpec
 
-import Command._
-import Combinators._
-
 class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   class ValidDelayLine(delay: Int) extends Module {
     val a = IO(Input(Valid(UInt(10.W))))
@@ -16,7 +13,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
     val default = Wire(Valid(UInt(10.W)))
     default.valid := false.B
     default.bits := 0.U
-    b := ShiftRegister(a, delay, default, en=1.B)
+    b := ShiftRegister(a, delay, default, 1.B)
   }
 
   class ValidDelayLineVIPs(a: Valid[UInt], b: Valid[UInt], proto: Valid[UInt]) {
@@ -66,7 +63,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
     val nElems = 10
     test(new ValidDelayLine(delay=nElems/2)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val vips = new ValidDelayLineVIPs(c.a, c.b, Valid(UInt(10.W)))
-      val result = Command.unsafeRun(vips.program(nElems), c.clock, print=false)
+      val result = unsafeRun(vips.program(nElems), c.clock)
       Predef.assert(result.retval == (0 until nElems))
     }
   }

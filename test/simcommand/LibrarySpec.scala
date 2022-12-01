@@ -5,7 +5,6 @@ import chisel3.util.Counter
 import chiseltest.{ChiselScalatestTester, VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock}
 import chiseltest.internal.NoThreadingAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
-import Helpers._
 
 class LibrarySpec extends AnyFlatSpec with ChiselScalatestTester {
   class LongDelay extends Module {
@@ -19,7 +18,7 @@ class LibrarySpec extends AnyFlatSpec with ChiselScalatestTester {
     test(new LongDelay()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation, NoThreadingAnnotation)) { c =>
       val program = waitForValue(c.a, 1.B)
       c.clock.setTimeout(200000)
-      val result = Command.unsafeRun(program, c.clock, false)
+      val result = unsafeRun(program, c.clock)
       assert(result.cycles > 100000)
       assert(result.threadsSpawned == 1)
     }

@@ -1,102 +1,27 @@
 package simcommand
 
-import chisel3._
+import chisel3.{Clock, Data, assert}
 import chiseltest._
 
-import collection.mutable
+import scala.collection.mutable
 
-// Below is inspired by the trampolined continuation in TailCalls.scala (in the Scala stdlib)
-object Command {
-  /**
-    * This class represents an RTL simulation command and its return value
-    * @tparam R Type of the command's return value
-    */
-   sealed abstract class Command[+R] {
-    final def map[R2](f: R => R2): Command[R2] = {
-      flatMap(r => Return(f(r)))
-    }
+case class Config(
+  print: Boolean = false, // Controls debug printing for the interpreter
+  recordActions: Boolean = false // Controls whether the interpreter should record the actions the program takes
+)
 
-    // flatMap is NOT stack safe
-    final def flatMap[R2](f: R => Command[R2]): Command[R2] = {
-      this match {
-        case Return(retval) => f(retval)
-        case c: Cont[a1, a2] => Cont(c.a, (x: a1) => c.f(x) flatMap f)
-        case c: Command[R] => Cont(c, f)
-      }
-    }
-  }
+sealed trait Action
+case class StepAct(cycles: Int) extends Action
+case class PokeAct(signal: Data, value: Data) extends Action
+case class PeekAct(signal: Data, value: Data) extends Action
 
-  // Command sum type
-  // Internal classes representing DUT interaction
-  protected case class Poke[I <: Data](signal: I, value: I) extends Command[Unit]
-  protected case class Peek[I <: Data](signal: I) extends Command[I]
+case class Result[R](retval: R, cycles: Int, threadsSpawned: Int, actions: Option[Seq[Action]])
 
-  // Internal class representing simulator synchronization points
-  protected case class Step(cycles: Int) extends Command[Unit]
+trait Interpreter {
+  def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R]
+}
 
-  // Internal class representing the end of a command sequence
-  protected case class Return[R](retval: R) extends Command[R]
-
-  // Internal class representing a continuation
-  protected case class Cont[R1, R2](a: Command[R1], f: R1 => Command[R2]) extends Command[R2]
-
-  // Internal classes representing fork/join synchronization
-  protected case class ThreadHandle[R](id: Int)
-  protected case class Fork[R](c: Command[R], name: String) extends Command[ThreadHandle[R]] {
-    def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
-  }
-  protected case class Join[R](threadHandle: ThreadHandle[R]) extends Command[R]
-
-  // Internal classes representing an inter-thread communication channel
-  // protected case class ChannelHandle[T](id: Int)
-  // protected case class MakeChannel[T]() extends Command[ChannelHandle[T]]
-  // protected case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
-  // protected case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
-  // protected case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
-
-  // Public API
-
-  // tailRecM will continually call f until it returns Command[Right]
-  // not tail recursive, but still stack safe
-  // similar implementation as cats.Free: https://github.com/typelevel/cats/pull/1041/files#diff-7349edfd077f9612f7181fe1f8caca63ac667c847ce83b53dceae4d08040fd55
-  final def tailRecM[R, R2](r: R)(f: R => Command[Either[R, R2]]): Command[R2] = {
-    f(r).flatMap {
-      case Left(value) => tailRecM(value)(f) // recursion here is lazy so the stack won't blow up
-      case Right(value) => lift(value)
-    }
-  }
-
-  def poke[I <: Data](signal: I, value: I): Command[Unit] = {
-    Poke(signal, value)
-  }
-
-  def peek[I <: Data](signal: I): Command[I] = {
-    Peek(signal)
-  }
-
-  def step[I <: Data](cycles: Int): Command[Unit] = {
-    Step(cycles)
-  }
-
-  def lift[R](value: R): Command[R] = {
-    Return(value)
-  }
-
-  def noop(): Command[Unit] = {
-    lift(())
-  }
-
-  def fork[R](cmd: Command[R], name: String): Command[ThreadHandle[R]] = {
-    Fork(cmd, name)
-  }
-
-  def join[R](handle: ThreadHandle[R]): Command[R] = {
-    Join(handle)
-  }
-
-  // Runtime
-  case class Result[R](retval: R, cycles: Int, threadsSpawned: Int)
-
+object Recursive extends Interpreter {
   private class ThreadIdGenerator {
     var count = 0
     def getNewThreadId: Int = {
@@ -108,8 +33,8 @@ object Command {
   private case class InterpreterCfg(print: Boolean)
   private case class EC(clock: Clock, threads: Seq[ThreadData])
 
-  def unsafeRun[R](cmd: Command[R], clock: Clock, print: Boolean): Result[R] = {
-    runInner(cmd, clock, print, new ThreadIdGenerator())
+  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = {
+    runInner(cmd, clock, cfg.print, new ThreadIdGenerator())
   }
 
   private def completedThread(t: ThreadData): Boolean = {
@@ -154,7 +79,7 @@ object Command {
       if (done.isDefined) {
         debug(cfg, ec.threads.head, time, s"Main thread returned at time $time with value ${done.get}")
         if (ec.threads.length > 1) debug(cfg, ec.threads.head, time, s"[FISHY] Main thread returning while child threads ${ec.threads.tail} aren't finished!")
-        return Result(done.get.asInstanceOf[R], time, retVals.keys.size)
+        return Result(done.get.asInstanceOf[R], time, retVals.keys.size, None)
       }
 
       // Are there any threads waiting on a join and we have data ready for it
@@ -181,7 +106,7 @@ object Command {
       //ec = ec.copy(threads=nextThreadHandlesAfterJoin)
       ec = ec.copy(threads=nextThreadHandles)
     }
-    ???
+    ??? // should never get here
   }
 
   private def runThreadsUntilSync(threads: Seq[ThreadData], time: Int, cfg: InterpreterCfg, threadIdGen: ThreadIdGenerator, retvals: mutable.Map[Int, Any]): Seq[ThreadData] = {
@@ -219,7 +144,7 @@ object Command {
         val forkedThreadHandle = f.makeThreadHandle(forkedThreadId)
         debug(cfg, thread, time, s"[Fork] Forking thread $name ($forkedThreadId)")
         runUntilSync(thread.copy(cmd=Return(forkedThreadHandle)), time, cfg, newThreads :+ ThreadData(c, name, forkedThreadId), threadIdGen, retvals)
-        // runUntilSync(thread.copy(cmd=next(forkedThreadHandle)), time, cfg, newThreads :+ ThreadData(c, name, forkedThreadId), threadIdGen)
+      // runUntilSync(thread.copy(cmd=next(forkedThreadHandle)), time, cfg, newThreads :+ ThreadData(c, name, forkedThreadId), threadIdGen)
       case Step(cycles) =>
         if (cycles == 0) { // this Step is a nop
           debug(cfg, thread, time, "[Step] 0 cycles (NOP)")
@@ -248,9 +173,13 @@ object Command {
         if (retvals.contains(threadHandle.id)) {
           // TODO: this isn't right - you don't necessarily need to step a cycle before a join can take place (it can happen on this same timestep)
           (thread.copy(cmd=Return(retvals(threadHandle.id))), 1, newThreads)
-        } else { // We're stil waiting on the join
+        } else { // We're still waiting on the join
           (thread, 1, newThreads)
         }
     }
   }
+}
+
+object Imperative extends Interpreter {
+  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = ???
 }

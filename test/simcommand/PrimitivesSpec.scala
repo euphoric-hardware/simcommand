@@ -1,6 +1,5 @@
 package simcommand
 
-import Command._
 import chisel3._
 import chiseltest._
 import chisel3.util.Counter
@@ -25,7 +24,7 @@ class PrimitivesSpec extends AnyFlatSpec with ChiselScalatestTester {
         _ <- step(1)
         v4 <- peek(c.a)
       } yield (v1.litValue, v2.litValue, v3.litValue, v4.litValue)
-      val result = Command.unsafeRun(program, c.clock, false)
+      val result = unsafeRun(program, c.clock)
       assert(result.retval == (0, 10, 0, 1))
     }
   }
@@ -53,7 +52,7 @@ class PrimitivesSpec extends AnyFlatSpec with ChiselScalatestTester {
         _ <- pokeOne(c.a, 200.U)
         v3 <- peek(c.aOut)
       } yield (v1.litValue, v2.litValue, v3.litValue)
-      val result = Command.unsafeRun(program, c.clock, false)
+      val result = unsafeRun(program, c.clock)
       assert(result.retval == (100, 100, 200))
     }
   }

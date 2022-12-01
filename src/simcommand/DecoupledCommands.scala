@@ -3,10 +3,6 @@ package simcommand
 import chisel3._
 import chisel3.util.DecoupledIO
 
-import Command._
-import Combinators._
-import Helpers._
-
 class DecoupledCommands[T <: Data](io: DecoupledIO[T]) {
   def enqueue(data: T): Command[Unit] = for {
     _ <- poke(io.bits, data)

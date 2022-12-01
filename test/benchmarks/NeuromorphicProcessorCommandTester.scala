@@ -5,7 +5,6 @@ import chisel3._
 import chiseltest._
 import chiseltest.internal.NoThreadingAnnotation
 import simcommand.UARTCommands
-import simcommand.Command._
 
 class NeuromorphicProcessorCommandTester extends NeuromorphicProcessorTester {
   it should "process an image" in {
@@ -34,8 +33,8 @@ class NeuromorphicProcessorCommandTester extends NeuromorphicProcessorTester {
 
         val program: Command[Seq[Int]] =
           for {
-            rxThread <- Command.fork(receiver, "receiver")
-            txThread <- Command.fork(sender, "sender")
+            rxThread <- simcommand.fork(receiver, "receiver")
+            txThread <- simcommand.fork(sender, "sender")
             _ <- {
               println("Loading image into accelerator")
               noop()
@@ -53,7 +52,7 @@ class NeuromorphicProcessorCommandTester extends NeuromorphicProcessorTester {
             }
           } yield resp
 
-        val result = Command.unsafeRun(program, dut.clock, print=false)
+        val result = unsafeRun(program, dut.clock)
         val spikes = result.retval.filter(_ < 200)
         assert(spikes.length == results.length, "number of spikes does not match expected")
         assert(spikes.zip(results).map(x => x._1 == x._2).reduce(_ && _), "spikes do not match expected")
