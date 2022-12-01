@@ -35,3 +35,5 @@ ucli.key
 *.fsdb
 novas_dump.log
 .nfs*
+
+sim_build

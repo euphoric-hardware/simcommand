@@ -1,0 +1,20 @@
+[[package]]
+name = "cocotb"
+version = "1.6.2"
+description = "cocotb is a coroutine based cosimulation library for writing VHDL and Verilog testbenches in Python."
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.extras]
+bus = ["cocotb-bus"]
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.8"
+content-hash = "2d109a0c010e3ed9c0e75a7661989951b699b6d27ccc89a98cfc5b7c76d10d4c"
+
+[metadata.files]
+cocotb = [
+    {file = "cocotb-1.6.2.tar.gz", hash = "sha256:498fb5ef6ec36d6320e829e61f0f24fd53f477005162cce7f98cb2bd95e0bd4b"},
+]
