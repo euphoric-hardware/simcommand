@@ -4,7 +4,6 @@ import chiseltest._
 import chisel3._
 
 class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester {
-
   it should "process an image" in {
     val startElab = System.nanoTime()
     test(new NeuromorphicProcessorBBWrapper())
@@ -34,7 +33,7 @@ class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester 
           dut.clock.step(bitDelay)
           // Byte
           for (i <- 0 until 8) {
-            byte = (dut.io.io_uartTx.peek.litValue << i).toInt | byte
+            byte = (dut.io.io_uartTx.peek().litValue << i).toInt | byte
             dut.clock.step(bitDelay)
           }
           // Stop bit
@@ -56,7 +55,7 @@ class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester 
         var receive = true
         val rec = fork {
           while (receive) {
-            if (!dut.io.io_uartTx.peek.litToBoolean) {
+            if (!dut.io.io_uartTx.peek().litToBoolean) {
               val s = transferByte()
               if (s < 200)
                 spikes = spikes :+ s
@@ -65,7 +64,7 @@ class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester 
             dut.clock.step()
           }
         }
-        rec.fork
+        //rec.fork()
 
         // Load an image into the accelerator ...
         println("Loading image into accelerator")
@@ -83,7 +82,7 @@ class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester 
         println("getting accelerator's response")
         dut.clock.step(FREQ/2)
         receive = false
-        rec.join
+        rec.join()
 
         println("Response received - comparing results")
 

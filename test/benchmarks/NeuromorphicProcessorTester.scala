@@ -3,7 +3,6 @@ package benchmarks
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
-import java.io.{FileNotFoundException, IOException}
 import scala.io.Source
 
 abstract class NeuromorphicProcessorTester extends AnyFlatSpec with ChiselScalatestTester {
