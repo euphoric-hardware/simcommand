@@ -21,9 +21,7 @@ lazy val root = (project in file("."))
     Compile / scalaSource := baseDirectory.value / "src",
     Compile / resourceDirectory := baseDirectory.value / "src" / "resources",
     Test / scalaSource := baseDirectory.value / "test",
-    Test / resourceDirectory := baseDirectory.value / "test" / "resources",
-    assembly / mainClass := Some("simapi.ProfilingExample"),
+    Test / resourceDirectory := baseDirectory.value / "test" / "resources"
   )
 
 fork in run := true
-mainClass in Compile := Some("simapi.ProfilingExample")
