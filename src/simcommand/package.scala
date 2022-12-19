@@ -7,7 +7,7 @@ package object simcommand {
     * This class represents an RTL simulation command and its return value
     * @tparam R Type of the command's return value
     */
-  sealed abstract class Command[+R] {
+  abstract class Command[+R] {
     final def map[R2](f: R => R2): Command[R2] = {
       flatMap(r => Return(f(r)))
     }
@@ -42,6 +42,7 @@ package object simcommand {
     def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
   }
   private[simcommand] case class Join[R](threadHandle: ThreadHandle[R]) extends Command[R]
+  private[simcommand] case class Kill[R](threadHandle: ThreadHandle[R]) extends Command[R]
 
   // Inter-thread communication channels
   // private[simcommand] case class ChannelHandle[T](id: Int)
@@ -53,7 +54,7 @@ package object simcommand {
   // Public API
 
   def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config = Config()): Result[R] = {
-    Recursive.unsafeRun(cmd, clock, cfg)
+    Imperative.unsafeRun(cmd, clock, cfg)
   }
 
   // tailRecM will continually call f until it returns Command[Right]

@@ -181,5 +181,143 @@ object Recursive extends Interpreter {
 }
 
 object Imperative extends Interpreter {
-  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = ???
+  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = {
+    val vm = new Imperative[R](clock)
+    vm.unsafeRun(cmd)
+  }
+}
+
+class Imperative[R](clock: Clock) {
+  private case class Apply[R1,R2](val cn: R1 => Command[R2]) extends Command[R2]
+  private case class ApplyRepeat[R](val cmd: Command[R], val n: Int, var i: Int) extends Command[R] {
+    val returns = new mutable.ArrayBuffer[R]()
+  }
+  private case class ApplyConcat[R](val cmds: Seq[Command[R]], var i: Int) extends Command[R] {
+    val returns = new mutable.ArrayBuffer[R]()
+  }
+
+  class Frame(val parent: Option[Frame], var cmd: Command[Any])
+
+  private val alive = new mutable.TreeSet[Thread[Any]]()
+  private val queue = new mutable.Queue[Thread[Any]]()
+  private val waiting = new mutable.TreeSet[Thread[Any]]()
+  private var threadCounter = 0
+  private var time = 0
+
+  def unsafeRun(cmd: Command[R]): Result[R] = {
+    val main = new Thread(cmd, "main")
+    while (alive.nonEmpty) {
+      stepClock()
+    }
+    Result(main.returns.get.asInstanceOf[R], time, threadCounter, None)
+  }
+
+  def stepClock() = {
+    queue.clear()
+    waiting.clear()
+    queue ++= alive
+
+    while (queue.nonEmpty) {
+      while (queue.nonEmpty) {
+        val thread = queue.dequeue()
+        thread.returns = thread.continue()
+        if      (thread.returns.isDefined) alive -= thread
+        else if (thread.monitor.isBlocked) waiting += thread
+      }
+
+      waiting.foreach {thread => if (thread.monitor.isResolved) {
+        queue += thread
+        waiting -= thread
+      }}
+    }
+
+    clock.step(1)
+    time += 1
+  }
+
+  sealed trait Monitor{
+    def isResolved: Boolean
+    def isBlocked: Boolean
+  }
+  case object NoneMonitor extends Monitor {
+    def isResolved = true
+    def isBlocked = false
+  }
+  case class ThreadMonitor(threads: Seq[Thread[Any]]) extends Monitor {
+    def isResolved = threads.forall {_.returns.isDefined}
+    def isBlocked = !isResolved && true
+  }
+  case class TimeMonitor(time: Int) extends Monitor {
+    def isResolved = time <= Imperative.this.time
+    def isBlocked = false
+  }
+
+  class Thread[+R1](start: Command[R1], name: String) extends ThreadHandle(threadCounter) with Ordered[Thread[_]] {
+    var frame = new Frame(None, start)
+    var monitor: Monitor = NoneMonitor
+    var returns: Option[Any] = None
+
+    def compare(other: Thread[_]) = id - other.id
+
+    threadCounter += 1
+    alive += this
+    queue += this
+
+    // Continue execution of the thread until it encounters a yield point or
+    // completes execution. Returns a None if not yet complete, returns Some(x)
+    // if the thread has completed execution.
+    def continue(): Option[R1] = {
+      while (monitor.isResolved && returns.isEmpty) {
+        returns = frame.cmd match {
+          // Control
+          case Cont(cmd, cn) => {
+            frame.cmd = new Apply(cn)
+            frame = new Frame(Some(frame), cmd)
+            None
+          }
+
+          case Fork(cmd, name) => ret(new Thread(cmd, name))
+          case Join(threads) => {
+            monitor = new ThreadMonitor(Seq(threads.asInstanceOf[Thread[Any]]))
+            None
+          }
+          case Step(cycles) => {
+            monitor = new TimeMonitor(Imperative.this.time + cycles)
+            ret(())
+          }
+
+          // Primitives
+          case Poke(signal, value) => ret(signal.poke(value))
+          case Peek(signal) => ret(signal.peek())
+          case Return(r) => ret(r)
+          case Kill(thread) => {
+            thread.asInstanceOf[Thread[Any]].returns = Some(())
+            ret(())
+          }
+        }
+      }
+      returns.asInstanceOf[Option[R1]]
+    }
+
+    private def ret(v: Any): Option[Any] = {
+      // If there is a parent frame, then escape to that frame. If not, then
+      // the root cmdession is fully evaluated sdo return a value
+      frame.parent match {
+        case Some(p) => frame = p
+        case None    => return Some(v)
+      }
+      // Special case for Cont(x, cn) cmdessions (which leave behind Apply(cn)
+      // as a resuidual, immediately run the continuation and resolve the next
+      // Command
+      frame.cmd match {
+        case Apply(cn) => frame.cmd = cn.asInstanceOf[Any => Command[Any]](v)
+        case x @ ApplyRepeat(cmd, n, i) => {
+          x.returns += v
+          x.i = i+1
+        }
+        case _ => ()
+      }
+      None
+    }
+  }
 }
