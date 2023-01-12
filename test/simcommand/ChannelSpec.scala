@@ -16,17 +16,17 @@ class ChannelSpec extends AnyFlatSpec with ChiselScalatestTester {
   "getBlocking" should "inspect the circuit IO and get its value" in {
     test(new Timer()) { c =>
       def putter(ch: ChannelHandle[BigInt]): Command[Unit] = for {
-        _ <- put[BigInt](ch, 1)
-        _ <- put[BigInt](ch, 2)
+        _ <- put(ch, BigInt(1))
+        _ <- put(ch, BigInt(2))
         _ <- step(1)
-        _ <- put[BigInt](ch, 3)
-        _ <- put[BigInt](ch, 4)
+        _ <- put(ch, BigInt(3))
+        _ <- put(ch, BigInt(4))
         _ <- step(1)
-        _ <- put[BigInt](ch, 5)
-        _ <- put[BigInt](ch, 6)
+        _ <- put(ch, BigInt(5))
+        _ <- put(ch, BigInt(6))
         _ <- step(1)
-        _ <- put[BigInt](ch, 7)
-        _ <- put[BigInt](ch, 8)
+        _ <- put(ch, BigInt(7))
+        _ <- put(ch, BigInt(8))
         _ <- step(1)
       } yield ()
 
