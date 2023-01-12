@@ -300,6 +300,9 @@ class Imperative[R](clock: Clock) {
           case Cont(cmd, cn) => {
             frame = new Frame(Some(frame), cmd)
           }
+          case Rec(st, fn) => {
+            frame = new Frame(Some(frame), fn(st))
+          }
 
           case Step(cycles) => {
             monitor = Some(new TimeMonitor(Imperative.this.time + cycles))
