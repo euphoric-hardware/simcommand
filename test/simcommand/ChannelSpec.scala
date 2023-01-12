@@ -47,7 +47,7 @@ class ChannelSpec extends AnyFlatSpec with ChiselScalatestTester {
 
       val result = unsafeRun(program, c.clock)
 
-      assert(result.retval == (1, 2, 3, 4, 5, 6, 7, 8))
+      assert(result.retval == Seq(1, 2, 3, 4, 5, 6, 7, 8))
     }
   }
 }
