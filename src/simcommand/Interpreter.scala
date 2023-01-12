@@ -393,7 +393,7 @@ class Imperative[R](clock: Clock) {
           }
 
           case NonEmpty(chan) => {
-            ???
+            ret(!lookupChannel(chan).isEmpty)
           }
 
         }
