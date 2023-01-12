@@ -35,6 +35,7 @@ package object simcommand {
 
   //// Continuation
   private[simcommand] case class Cont[R1, R2](a: Command[R1], f: R1 => Command[R2]) extends Command[R2]
+  private[simcommand] case class Rec[R1, R2](st: R1, f: R1 => Command[Either[R1, R2]]) extends Command[R2]
 
   //// fork/join synchronization
   private[simcommand] case class ThreadHandle[R](id: Int)
@@ -61,10 +62,11 @@ package object simcommand {
   // not tail recursive, but still stack safe
   // similar implementation as cats.Free: https://github.com/typelevel/cats/pull/1041/files#diff-7349edfd077f9612f7181fe1f8caca63ac667c847ce83b53dceae4d08040fd55
   final def tailRecM[R, R2](r: R)(f: R => Command[Either[R, R2]]): Command[R2] = {
-    f(r).flatMap {
-      case Left(value) => tailRecM(value)(f) // recursion here is lazy so the stack won't blow up
-      case Right(value) => lift(value)
-    }
+    Rec(r, f)
+    // f(r).flatMap {
+    //   case Left(value) => tailRecM(value)(f) // recursion here is lazy so the stack won't blow up
+    //   case Right(value) => lift(value)
+    // }
   }
 
   def poke[I <: Data](signal: I, value: I): Command[Unit] = {
