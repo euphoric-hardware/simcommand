@@ -193,11 +193,17 @@ class Imperative[R](clock: Clock) {
   private val queue = new mutable.Queue[Thread[Any]]()
   private val waiting = new mutable.TreeSet[Thread[Any]]()
 
+  private val channelMap = new mutable.WeakHashMap[ChannelHandle[_], Channel[_]]()
+  private var channelCounter = 0
   private val threadMap = new mutable.WeakHashMap[ThreadHandle[_], Thread[_]]()
   private var threadCounter = 0
 
   def lookupThread[R1](handle: ThreadHandle[R1]): Thread[R1] = {
     threadMap.apply(handle).asInstanceOf[Thread[R1]]
+  }
+
+  def lookupChannel[R1](handle: ChannelHandle[R1]): Channel[R1] = {
+    channelMap.apply(handle).asInstanceOf[Channel[R1]]
   }
 
   def unsafeRun(cmd: Command[R]): Result[R] = {
@@ -246,6 +252,29 @@ class Imperative[R](clock: Clock) {
     def canRunThisCycle = false
     def resolve() = ()
   }
+  case class SendMonitor[M](channel: Channel[M], data: M) extends Monitor[Unit] {
+    var sent = false
+    def isResolved = {
+      if (!sent && channel.hasSpace) {
+        channel.push(data)
+        sent = true
+      }
+      sent
+    }
+    def canRunThisCycle = true
+    def resolve() = ()
+  }
+  case class RecvMonitor[M](channel: Channel[M]) extends Monitor[M] {
+    var item: Option[M] = None
+    def isResolved = {
+      if (item.isEmpty && !channel.isEmpty) {
+        item = Some(channel.pop())
+      }
+      item.isDefined
+    }
+    def canRunThisCycle = true
+    def resolve() = item.get
+  }
 
   class Frame(val parent: Option[Frame], val cmd: Command[Any])
 
@@ -266,6 +295,28 @@ class Imperative[R](clock: Clock) {
     def get = ???
   }
 
+  class Channel[M](size: Int) {
+    val buffer = new mutable.Queue[M]()
+    val handle  = new ChannelHandle(threadCounter)
+
+    channelMap += (handle -> this)
+    channelCounter += 1
+
+    def push(v: M) = {
+      buffer += v
+    }
+
+    def pop(): M = {
+      buffer.dequeue()
+    }
+
+    def hasSpace = {
+      buffer.size < size
+    }
+
+    def isEmpty = {
+      buffer.isEmpty
+    }
   }
 
   class Thread[+R1](start: Command[R1], name: String) extends Ordered[Thread[_]] {
@@ -327,6 +378,24 @@ class Imperative[R](clock: Clock) {
             lookupThread(thread).status = Killed
             ret(())
           }
+
+          case MakeChannel(size) => {
+            val chan = new Channel(size)
+            ret(chan.handle)
+          }
+
+          case Put(chan, data) => {
+            monitor = Some(new SendMonitor(lookupChannel(chan), data))
+          }
+
+          case GetBlocking(chan) => {
+            monitor = Some(new RecvMonitor(lookupChannel(chan)))
+          }
+
+          case NonEmpty(chan) => {
+            ???
+          }
+
         }
       }
 
