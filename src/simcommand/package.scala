@@ -46,11 +46,11 @@ package object simcommand {
   private[simcommand] case class Kill[R](threadHandle: ThreadHandle[R]) extends Command[R]
 
   // Inter-thread communication channels
-  // private[simcommand] case class ChannelHandle[T](id: Int)
-  // private[simcommand] case class MakeChannel[T]() extends Command[ChannelHandle[T]]
-  // private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
-  // private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
-  // private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
+  private[simcommand] case class ChannelHandle[T](id: Int)
+  private[simcommand] case class MakeChannel[T](size: Integer) extends Command[ChannelHandle[T]]
+  private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
+  private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
+  private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
 
   // Public API
 
@@ -97,8 +97,23 @@ package object simcommand {
     Join(handle)
   }
 
-  // Command combinators (functions that take Commands and return Commands)
+  def makeChannel[R](size: Integer): Command[ChannelHandle[R]] = {
+    MakeChannel(size)
+  }
 
+  def put[R](chan: ChannelHandle[R], data: R): Command[Unit] = {
+    Put(chan, data)
+  }
+
+  def getBlocking[R](chan: ChannelHandle[R]): Command[R] = {
+    GetBlocking(chan)
+  }
+
+  def nonEmpty[R](chan: ChannelHandle[R]): Command[Boolean] = {
+    NonEmpty(chan)
+  }
+
+  // Command combinators (functions that take Commands and return Commands)
   def repeat(cmd: Command[_], n: Int): Command[Unit] = {
     tailRecM(0) { iteration =>
       if (iteration == n) lift(Right(()))
