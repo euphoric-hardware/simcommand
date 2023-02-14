@@ -7,17 +7,35 @@ package object simcommand {
     * This class represents an RTL simulation command and its return value
     * @tparam R Type of the command's return value
     */
-  abstract class Command[+R] {
+  sealed abstract class Command[R] {
     final def map[R2](f: R => R2): Command[R2] = {
       flatMap(r => Return(f(r)))
     }
 
-    // flatMap is NOT stack safe
     final def flatMap[R2](f: R => Command[R2]): Command[R2] = {
       this match {
         case Return(retval) => f(retval)
         case c: Cont[a1, a2] => Cont(c.a, (x: a1) => c.f(x) flatMap f)
         case c: Command[R] => Cont(c, f)
+      }
+    }
+
+    // tailRec provides an efficent tail recursion primitive. If the provided
+    // function takes in arguments and returns Command[Left(newArguments)], it
+    // flatMaps again with the new arguments. If given a
+    // Command[Right(result)], it will instead lift the internal result.
+    final def tailRec[R2](f: R => Command[Either[R, R2]]): Command[R2] = {
+      this.flatMap(Rec(_, f))
+    }
+
+    // tailRecM is the functional version of tailRecM. This version is
+    // also safe, but tends to be significantly slower.
+    // Similar implementation as cats.Free: https://github.com/typelevel/cats/pull/1041/files#diff-7349edfd077f9612f7181fe1f8caca63ac667c847ce83b53dceae4d08040fd55
+    final def tailRecM[R2](f: R => Command[Either[R, R2]]): Command[R2] = {
+      this.flatMap(f).flatMap {
+        // recursion here is lazy so the stack won't blow up
+        case Left(value) => tailRecM(f)
+        case Right(result) => lift(result)
       }
     }
   }
@@ -28,7 +46,7 @@ package object simcommand {
   private[simcommand] case class Peek[I <: Data](signal: I) extends Command[I]
 
   //// Simulator synchronization points
-  private[simcommand] case class Step(cycles: Int) extends Command[Unit]
+  private[simcommand] case class Step(cycles: Int) extends Command[Int]
 
   //// End of a command sequence / Pure value
   private[simcommand] case class Return[R](retval: R) extends Command[R]
@@ -58,17 +76,6 @@ package object simcommand {
     Imperative.unsafeRun(cmd, clock, cfg)
   }
 
-  // tailRecM will continually call f until it returns Command[Right]
-  // not tail recursive, but still stack safe
-  // similar implementation as cats.Free: https://github.com/typelevel/cats/pull/1041/files#diff-7349edfd077f9612f7181fe1f8caca63ac667c847ce83b53dceae4d08040fd55
-  final def tailRecM[R, R2](r: R)(f: R => Command[Either[R, R2]]): Command[R2] = {
-    Rec(r, f)
-    // f(r).flatMap {
-    //   case Left(value) => tailRecM(value)(f) // recursion here is lazy so the stack won't blow up
-    //   case Right(value) => lift(value)
-    // }
-  }
-
   def poke[I <: Data](signal: I, value: I): Command[Unit] = {
     Poke(signal, value)
   }
@@ -77,7 +84,7 @@ package object simcommand {
     Peek(signal)
   }
 
-  def step[I <: Data](cycles: Int): Command[Unit] = {
+  def step[I <: Data](cycles: Int): Command[Int] = {
     Step(cycles)
   }
 
@@ -115,7 +122,7 @@ package object simcommand {
 
   // Command combinators (functions that take Commands and return Commands)
   def repeat(cmd: Command[_], n: Int): Command[Unit] = {
-    tailRecM(0) { iteration =>
+    lift(0).tailRec { iteration =>
       if (iteration == n) lift(Right(()))
       else for {
         _ <- cmd
@@ -124,7 +131,7 @@ package object simcommand {
   }
 
   def repeatCollect[R](cmd: Command[R], n: Int): Command[Seq[R]] = {
-    tailRecM(0, Vector.empty[R]) { case (iteration, collection) =>
+    lift((0, Vector.empty[R])).tailRec { case (iteration, collection) =>
       if (iteration == n) lift(Right(collection))
       else for {
         retval <- cmd
@@ -133,43 +140,72 @@ package object simcommand {
   }
 
   def doWhile(cmd: Command[Boolean]): Command[Unit] = {
-    tailRecM(()) { _: Unit =>
-      for {
-        cond <- cmd
-        retval <- {if (cond) lift(Left(())) else lift(Right(()))}
-      } yield retval
+    lift(()).tailRec { _: Unit =>
+      cmd.flatMap {if (_) lift(Left(())) else lift(Right(()))}
     }
   }
 
   def doWhileCollect[R](cmd: Command[(R, Boolean)]): Command[Seq[R]] = {
-    ???
+    lift(Seq[R]()).tailRec { seq: Seq[R] =>
+      for {
+        result <- cmd
+        retval <- {
+          val (v, cond) = result
+          if (cond) lift(Left(seq :+ v)) else lift(Right(seq))
+        }
+      } yield retval
+    }
   }
 
   def doWhileCollectLast[R](cmd: Command[(R, Boolean)]): Command[R] = {
-    ???
+    lift(()).tailRec { _: Unit =>
+      for {
+        result <- cmd
+        retval <- {
+          val (v, cond) = result
+          if (cond) lift(Left(())) else lift(Right(v))
+        }
+      } yield retval
+    }
   }
 
-  def doWhile[R, S](cond: S => Boolean, action: Command[(R, S)], initialState: S): Command[Seq[R]] = {
-    ???
+  def whileM[R, S](cond: S => Boolean, action: Command[(R, S)], initialState: S): Command[Seq[R]] = {
+    lift((initialState, Seq[R]())).tailRec { t: (S, Seq[R]) =>
+      val (state: S, seq: Seq[R]) = t
+      if (cond(state)) for {
+        result <- action
+        retval <- {
+          val (v, newState) = result
+          lift(Left((newState, seq :+ v)))
+        }
+      } yield retval
+      else lift(Right(seq))
+    }
   }
 
   def forever(cmd: Command[_]): Command[Nothing] = {
-    tailRecM(()){ _: Unit =>
-      lift(Left(cmd))
+    lift(()).tailRec[Nothing] { _: Unit =>
+      lift(Left(()))
     }
   }
 
   def zip[R1, R2](cmd1: Command[R1], cmd2: Command[R2]): Command[(R1, R2)] = {
-    ???
+    for {
+      v1 <- cmd1
+      v2 <- cmd2
+    } yield (v1, v2)
   }
 
   def map2[R1, R2, R3](cmd1: Command[R1], cmd2: Command[R2], f: (R1, R2) => R3): Command[R3] = {
-    ???
+    for {
+      v1 <- cmd1
+      v2 <- cmd2
+    } yield f(v1, v2)
   }
 
   // See Cats 'Traverse' which provides 'sequence' which is exactly this type signature
   def sequence[R](cmds: Seq[Command[R]]): Command[Seq[R]] = {
-    tailRecM((cmds, Vector.empty[R])) { case (cmds, retvalSeq) =>
+    lift((cmds, Vector.empty[R])).tailRec { case (cmds, retvalSeq) =>
       if (cmds.isEmpty) lift(Right(retvalSeq))
       else for {
         retval <- cmds.head
@@ -177,15 +213,13 @@ package object simcommand {
     }
   }
 
-  def traverse[R, R2](cmds: Seq[Command[R]])(f: R => Command[R2]): Seq[Command[R2]] = {
-    ???
+  def traverse[R, R2](cmds: Seq[Command[R]])(f: R => Command[R2]): Command[Seq[R2]] = {
+    sequence(cmds.map(_.flatMap(f)))
   }
 
-  // specialization of sequence to throw away return values
-  // TODO: is this called sequence_ in cats?
   def concat[R](cmds: Seq[Command[R]]): Command[Unit] = {
-    tailRecM(cmds) { case cmds =>
-      if (cmds.isEmpty) lift(Right(noop()))
+    lift(cmds).tailRec { case cmds =>
+      if (cmds.isEmpty) lift(Right(()))
       else for {
         _ <- cmds.head
       } yield Left(cmds.tail)
@@ -204,25 +238,6 @@ package object simcommand {
         c2Ret <- c2(c1Ret)
       } yield c2Ret
     }
-  }
-
-  // TODO: duplicate
-  def ifThenElse[R](cond: Command[Boolean], ifTrue: Command[R], ifFalse: Command[R]): Command[R] = {
-    for {
-      c <- cond
-      result <- {
-        if (c) ifTrue
-        else ifFalse
-      }
-    } yield result
-  }
-
-  // TODO: should be a member of Command[Boolean]
-  def ifM[R](cond: Command[Boolean], ifTrue: Command[R], ifFalse: Command[R]): Command[R] = {
-    for {
-      c <- cond
-      result <- {if (c) ifTrue else ifFalse}
-    } yield result
   }
 
   def waitForValue[I <: Data](signal: I, value: I): Command[Unit] = {

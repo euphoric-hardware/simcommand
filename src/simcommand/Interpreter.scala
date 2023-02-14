@@ -189,9 +189,9 @@ object Imperative extends Interpreter {
 
 class Imperative[R](clock: Clock) {
   private var time = 0
-  private val alive = new mutable.TreeSet[Thread[Any]]()
-  private val queue = new mutable.Queue[Thread[Any]]()
-  private val waiting = new mutable.TreeSet[Thread[Any]]()
+  private val alive = new mutable.TreeSet[Thread[_]]()
+  private val queue = new mutable.Queue[Thread[_]]()
+  private val waiting = new mutable.TreeSet[Thread[_]]()
 
   private val channelMap = new mutable.WeakHashMap[ChannelHandle[_], Channel[_]]()
   private var channelCounter = 0
@@ -247,10 +247,10 @@ class Imperative[R](clock: Clock) {
     def canRunThisCycle = !isResolved
     def resolve() = thread.status.get.asInstanceOf[M]
   }
-  case class TimeMonitor(time: Int) extends Monitor[Unit] {
+  case class TimeMonitor(time: Int) extends Monitor[Int] {
     def isResolved = time <= Imperative.this.time
     def canRunThisCycle = false
-    def resolve() = ()
+    def resolve() = Imperative.this.time
   }
   case class SendMonitor[M](channel: Channel[M], data: M) extends Monitor[Unit] {
     var sent = false
@@ -276,7 +276,7 @@ class Imperative[R](clock: Clock) {
     def resolve() = item.get
   }
 
-  class Frame(val parent: Option[Frame], val cmd: Command[Any])
+  class Frame(val parent: Option[Frame], val cmd: Command[_])
 
   trait ThreadStatus[+R] {
     val isDone: Boolean
@@ -319,7 +319,7 @@ class Imperative[R](clock: Clock) {
     }
   }
 
-  class Thread[+R1](start: Command[R1], name: String) extends Ordered[Thread[_]] {
+  class Thread[R1](start: Command[R1], name: String) extends Ordered[Thread[_]] {
     var frame = new Frame(None, start)
     var monitor: Option[Monitor[_]] = None
     var status: ThreadStatus[_] = Running
@@ -340,7 +340,7 @@ class Imperative[R](clock: Clock) {
 
       while (monitor.forall(_.isResolved) && !status.isDone) {
         if (monitor.isDefined && monitor.get.isResolved) {
-          ret(monitor.get.resolve)
+          ret(monitor.get.resolve())
           monitor = None
         }
 
@@ -366,7 +366,7 @@ class Imperative[R](clock: Clock) {
             case Done(v) => ret(v)
             // FIXME: Consider whether or not this should error, or if we
             // should change the API to be safe regardless of killed status
-            case Killed => throw new RuntimeException("Cannot join value of a killed thread")
+            case Killed => throw new RuntimeException("Cannot join on a killed thread")
             case Running => {
               monitor = Some(new ThreadMonitor(lookupThread(thread)))
             }
