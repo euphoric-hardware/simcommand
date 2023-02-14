@@ -218,11 +218,21 @@ class Imperative[R](clock: Clock) {
     queue.clear()
     waiting.clear()
     queue ++= alive
+    var nextTime = time + 128;
 
     while (queue.nonEmpty) {
       while (queue.nonEmpty) {
         val thread = queue.dequeue()
         thread.status = thread.continue()
+        if (!thread.status.isDone) {
+          thread.monitor match {
+            case Some(monitor) => monitor match {
+              case TimeMonitor(t) => if (t < nextTime) nextTime = t
+              case _ => ()
+            }
+          }
+        }
+
         if      (thread.status.isDone) alive -= thread
         else if (thread.monitor.forall(_.canRunThisCycle)) waiting += thread
       }
@@ -232,9 +242,10 @@ class Imperative[R](clock: Clock) {
         waiting -= thread
       }}
     }
-
-    clock.step(1)
-    time += 1
+    if (alive.nonEmpty) {
+      clock.step(nextTime - time)
+      time = nextTime
+    }
   }
 
   sealed trait Monitor[M]{
