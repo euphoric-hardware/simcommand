@@ -1,9 +1,9 @@
 package jmhbenchmarks
 
 import chisel3._
-import chiseltest.{HasTestName, defaults}
+import chiseltest.{HasTestName, VerilatorBackendAnnotation, WriteVcdAnnotation, defaults}
 import chiseltest.formal.Formal
-import chiseltest.internal.{BackendInstance, Context, TestEnvInterface}
+import chiseltest.internal.{BackendInstance, Context, NoThreadingAnnotation, TestEnvInterface}
 import firrtl.options.TargetDirAnnotation
 import org.openjdk.jmh.annotations.{Level, Setup}
 
@@ -20,7 +20,7 @@ class BenchmarkState[R <: Module](mod: () => R) extends TestEnvInterface with Ha
     topFileName = Some(testname)
     batchedFailures.clear()
     val annotation = TargetDirAnnotation("test_run_dir" + File.separator + testname)
-    tester = defaults.createDefaultTester(mod, Seq(annotation))
+    tester = defaults.createDefaultTester(mod, Seq(annotation, NoThreadingAnnotation))
   }
 
   def getTestName = testname
