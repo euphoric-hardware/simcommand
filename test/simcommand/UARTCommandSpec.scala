@@ -1,8 +1,9 @@
 package simcommand
 
 import chisel3._
-import chiseltest.{testableClock, ChiselScalatestTester, WriteVcdAnnotation}
+import chiseltest.{ChiselScalatestTester, VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock}
 import chisel3.util.log2Ceil
+import chiseltest.internal.NoThreadingAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
 
 class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
@@ -56,11 +57,40 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   "receiveByte" should "receive a single byte sent by the UART" in {
     val testByte = Seq(0x55)
     val bitDelay = 4
-    test(new UARTMock(testByte, bitDelay)) { c =>
+    test(new UARTMock(testByte, bitDelay)).withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val result = unsafeRun(cmds.receiveByte(), c.clock)
       assert(result.retval == testByte.head)
     }
+  }
+
+  "receiveByte" should "receive a single byte sent by the UART (command)" in {
+    val testByte = 0x55
+    val rx = binding(0.B)
+    val tx = binding(0.B)
+    val bitDelay = 4
+
+    val cmds = new UARTCommands(uartIn = rx, uartOut = tx, cyclesPerBit = bitDelay)
+    val mock = for {
+      _ <- poke(tx, 0.B)
+      _ <- step(bitDelay)
+      _ <- concat((0 until 8).map(i => for {
+        _ <- poke(tx, ((testByte >> i) & 0x1).B)
+        _ <- step(bitDelay)
+      } yield ()))
+      _ <- poke(tx, 1.B)
+      _ <- step(bitDelay)
+    } yield ()
+
+    val program = for {
+      mockHandle <- fork(mock, name="mock", order=0)
+      receiveHandle <- fork(cmds.receiveByte(), name="receiveByte", order=1)
+      _ <- join(mockHandle)
+      recv <- join(receiveHandle)
+    } yield recv
+
+    val result = unsafeRun(program, FakeClock(), Config(timeout=bitDelay * 10))
+    assert(result.retval == testByte)
   }
 
   "receiveBytes" should "receive multiple bytes sent by the UART" in {

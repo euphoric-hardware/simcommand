@@ -25,6 +25,13 @@ class DecoupledCommands[T <: Data](io: DecoupledIO[T]) {
     _ <- step(1)
   } yield value
 
+  def dequeue[R <: Data](extract: T => R): Command[R] = for {
+    _ <- waitForValue(io.valid, true.B)
+    _ <- poke(io.ready, true.B)
+    value <- peek(extract(io.bits))
+    _ <- step(1)
+  } yield value
+
   def dequeueN(n: Int): Command[Seq[T]] = {
     repeatCollect(dequeue(), n)
   }

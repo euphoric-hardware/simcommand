@@ -3,9 +3,7 @@ package simcommand
 import chisel3._
 import chisel3.experimental.{DataMirror, Direction}
 
-class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool, cyclesPerBit: Int) {
-  assert(DataMirror.directionOf(uartIn) == Direction.Input)
-  assert(DataMirror.directionOf(uartOut) == Direction.Output)
+class UARTCommands(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chisel3.Bool], cyclesPerBit: Int) {
   val bitsPerSymbol = 10
   // sending a UART byte using cocotb
   /*
@@ -82,9 +80,9 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool, cyclesPerBit: In
     } yield b.litValue.toInt
   }
 
-  def receiveByte(): Command[Int] =
+  def receiveByte(): Command[Int] = {
     for {
-      _ <- waitForValue(uartOut, 0.U) // wait until start bit is seen // TODO: reduce polling frequency
+      _ <- waitForValue(uartOut, false.B, cyclesPerBit/4) // Wait for the start bit // TODO: reduce polling frequency
       _ <- step(cyclesPerBit / 2) // shift time to center-of-symbol
       bits <- sequence(Seq.fill(8)(receiveBit()))
       _ <- step(cyclesPerBit + cyclesPerBit / 2) // advance time past 1/2 of last data bit and stop bit
@@ -96,6 +94,7 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool, cyclesPerBit: In
         noop()
       }
     } yield byte
+  }
 
   def receiveBytes(nBytes: Int): Command[Seq[Int]] = {
     val cmds = Seq.fill(nBytes)(receiveByte())
@@ -103,13 +102,13 @@ class UARTCommands(uartIn: chisel3.Bool, uartOut: chisel3.Bool, cyclesPerBit: In
   }
 }
 
-class UARTChecker(serialLine: chisel3.Bool) {
+class UARTChecker(serialLine: Interactable[chisel3.Bool]) {
   def checkByte(bitDelay: Int): Command[Boolean] = {
     for {
-      _ <- waitForValue(serialLine, 0.U) // Wait for the start bit
-      stableStartBit <- checkStable(serialLine, 0.U, bitDelay) // Start bit should be stable until symbol edge
+      _ <- waitForValue(serialLine, false.B) // Wait for the start bit
+      stableStartBit <- checkStable(serialLine, false.B, bitDelay) // Start bit should be stable until symbol edge
       _ <- step(bitDelay*8) // Let the 8 data bits pass
-      stableStopBit <- checkStable(serialLine, 1.U, bitDelay) // Stop bit should be stable until byte finished
+      stableStopBit <- checkStable(serialLine, true.B, bitDelay) // Stop bit should be stable until byte finished
     } yield stableStartBit && stableStopBit
   }
 

@@ -5,7 +5,6 @@ ThisBuild / organization     := "edu.berkeley.cs"
 val chiselVersion = "3.5.4"
 
 lazy val root = (project in file("."))
-  .enablePlugins(JmhPlugin)
   .settings(
     name := "simcommand",
     libraryDependencies ++= Seq(

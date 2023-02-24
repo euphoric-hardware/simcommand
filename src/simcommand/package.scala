@@ -1,4 +1,6 @@
-import chisel3.{Clock, Data}
+import chisel3.{Data}
+
+import scala.collection.mutable.ArrayBuffer
 
 package object simcommand {
 
@@ -15,7 +17,6 @@ package object simcommand {
     final def flatMap[R2](f: R => Command[R2]): Command[R2] = {
       this match {
         case Return(retval) => f(retval)
-        case c: Cont[a1, a2] => Cont(c.a, (x: a1) => c.f(x) flatMap f)
         case c: Command[R] => Cont(c, f)
       }
     }
@@ -34,19 +35,52 @@ package object simcommand {
     final def tailRecM[R2](f: R => Command[Either[R, R2]]): Command[R2] = {
       this.flatMap(f).flatMap {
         // recursion here is lazy so the stack won't blow up
-        case Left(value) => tailRecM(f)
+        case Left(_) => tailRecM(f)
         case Right(result) => lift(result)
       }
     }
   }
 
+  sealed trait Interactable[I] {
+    def set(value: I): Unit
+    def get(): I
+    def compare(value: I): Command[Boolean]
+  }
+
+  implicit class Chisel3Interactor[I <: Data](value: I) extends Interactable[I] {
+    val tester = chiseltest.testableData(value)
+    override def set(p: I): Unit = tester.poke(p)
+    override def get(): I = tester.peek()
+    // TODO: Implement a better comparator for chisel3 datatypes
+    override def compare(v: I): Command[Boolean] = peek(this).map(_.litValue == v.litValue)
+  }
+
+  private case class PrimitiveInteractor[I](var value: I) extends Interactable[I] {
+    override def set(p: I): Unit = value = p
+    override def get(): I = value
+    override def compare(v: I): Command[Boolean] = value match {
+      case x: Data => peek(this).map(_.asInstanceOf[Data].litValue == v.asInstanceOf[Data].litValue)
+      case _ => peek(this).map(_ == v)
+    }
+  }
+
+  trait Steppable {
+    def step(cycles: Int): Unit
+  }
+  private case class Chisel3Clock(clock: chisel3.Clock) extends Steppable {
+    def step(cycles: Int): Unit = chiseltest.testableClock(clock).step(cycles)
+  }
+  case class FakeClock() extends Steppable {
+    def step(cycles: Int): Unit = {}
+  }
+
   // Command sum type
   //// DUT interaction
-  private[simcommand] case class Poke[I <: Data](signal: I, value: I) extends Command[Unit]
-  private[simcommand] case class Peek[I <: Data](signal: I) extends Command[I]
+  private[simcommand] case class Poke[I](signal: Interactable[I], value: I) extends Command[Unit]
+  private[simcommand] case class Peek[I](signal: Interactable[I]) extends Command[I]
 
   //// Simulator synchronization points
-  private[simcommand] case class Step(cycles: Int) extends Command[Int]
+  private[simcommand] case class Step(cycles: Int) extends Command[Unit]
 
   //// End of a command sequence / Pure value
   private[simcommand] case class Return[R](retval: R) extends Command[R]
@@ -57,7 +91,7 @@ package object simcommand {
 
   //// fork/join synchronization
   private[simcommand] case class ThreadHandle[R](id: Int)
-  private[simcommand] case class Fork[R](c: Command[R], name: String) extends Command[ThreadHandle[R]] {
+  private[simcommand] case class Fork[R](c: Command[R], name: String, order: Int) extends Command[ThreadHandle[R]] {
     def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
   }
   private[simcommand] case class Join[R](threadHandle: ThreadHandle[R]) extends Command[R]
@@ -65,26 +99,30 @@ package object simcommand {
 
   // Inter-thread communication channels
   private[simcommand] case class ChannelHandle[T](id: Int)
-  private[simcommand] case class MakeChannel[T](size: Integer) extends Command[ChannelHandle[T]]
+  private[simcommand] case class MakeChannel[T](size: Int) extends Command[ChannelHandle[T]]
   private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
   private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
   private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
 
   // Public API
 
-  def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config = Config()): Result[R] = {
+  def unsafeRun[R](cmd: Command[R], clock: chisel3.Clock, cfg: Config = Config()): Result[R] = {
+    unsafeRun(cmd, Chisel3Clock(clock), cfg)
+  }
+
+  def unsafeRun[R](cmd: Command[R], clock: Steppable, cfg: Config): Result[R] = {
     Imperative.unsafeRun(cmd, clock, cfg)
   }
 
-  def poke[I <: Data](signal: I, value: I): Command[Unit] = {
+  def poke[I](signal: Interactable[I], value: I): Command[Unit] = {
     Poke(signal, value)
   }
 
-  def peek[I <: Data](signal: I): Command[I] = {
+  def peek[I](signal: Interactable[I]): Command[I] = {
     Peek(signal)
   }
 
-  def step[I <: Data](cycles: Int): Command[Int] = {
+  def step(cycles: Int): Command[Unit] = {
     Step(cycles)
   }
 
@@ -96,15 +134,15 @@ package object simcommand {
     lift(())
   }
 
-  def fork[R](cmd: Command[R], name: String): Command[ThreadHandle[R]] = {
-    Fork(cmd, name)
+  def fork[R](cmd: Command[R], name: String, order: Int = 0): Command[ThreadHandle[R]] = {
+    Fork(cmd, name, order)
   }
 
   def join[R](handle: ThreadHandle[R]): Command[R] = {
     Join(handle)
   }
 
-  def makeChannel[R](size: Integer): Command[ChannelHandle[R]] = {
+  def makeChannel[R](size: Int): Command[ChannelHandle[R]] = {
     MakeChannel(size)
   }
 
@@ -120,6 +158,10 @@ package object simcommand {
     NonEmpty(chan)
   }
 
+  def binding[I](value: I): Interactable[I] = {
+    PrimitiveInteractor(value)
+  }
+
   // Command combinators (functions that take Commands and return Commands)
   def repeat(cmd: Command[_], n: Int): Command[Unit] = {
     lift(0).tailRec { iteration =>
@@ -131,11 +173,9 @@ package object simcommand {
   }
 
   def repeatCollect[R](cmd: Command[R], n: Int): Command[Seq[R]] = {
-    lift((0, Vector.empty[R])).tailRec { case (iteration, collection) =>
-      if (iteration == n) lift(Right(collection))
-      else for {
-        retval <- cmd
-      } yield Left((iteration + 1, collection :+ retval))
+    lift((0, ArrayBuffer.empty[R])).tailRec { case (it, buf) =>
+      if (it == n) lift(Right(buf.toSeq))
+      else cmd.flatMap {value => lift(Left((it + 1, buf += value)))}
     }
   }
 
@@ -146,12 +186,12 @@ package object simcommand {
   }
 
   def doWhileCollect[R](cmd: Command[(R, Boolean)]): Command[Seq[R]] = {
-    lift(Seq[R]()).tailRec { seq: Seq[R] =>
+    lift(ArrayBuffer.empty[R]).tailRec { buf: ArrayBuffer[R] =>
       for {
         result <- cmd
         retval <- {
           val (v, cond) = result
-          if (cond) lift(Left(seq :+ v)) else lift(Right(seq))
+          if (cond) lift(Left(buf += v)) else lift(Right(buf.toSeq))
         }
       } yield retval
     }
@@ -174,11 +214,11 @@ package object simcommand {
       val (state: S, seq: Seq[R]) = t
       if (cond(state)) for {
         result <- action
-        retval <- {
+        value <- {
           val (v, newState) = result
           lift(Left((newState, seq :+ v)))
         }
-      } yield retval
+      } yield value
       else lift(Right(seq))
     }
   }
@@ -218,7 +258,7 @@ package object simcommand {
   }
 
   def concat[R](cmds: Seq[Command[R]]): Command[Unit] = {
-    lift(cmds).tailRec { case cmds =>
+    lift(cmds).tailRec { cmds =>
       if (cmds.isEmpty) lift(Right(()))
       else for {
         _ <- cmds.head
@@ -240,33 +280,21 @@ package object simcommand {
     }
   }
 
-  def waitForValue[I <: Data](signal: I, value: I): Command[Unit] = {
+  def waitForValue[I](signal: Interactable[I], value: I, cycles: Int = 1): Command[Unit] = {
     // TODO: return # of cycles this program waited
-    val check: Command[Boolean] = for {
-      peekedValue <- peek(signal)
-      _ <- {
-        if (peekedValue.litValue != value.litValue) // TODO: this won't work for record types
-          step(1)
-        else
-          noop()
-      }
-    } yield peekedValue.litValue != value.litValue
-    doWhile(check)
+    doWhile(for {
+      done <- signal.compare(value)
+      _ <- {if (!done) step(cycles) else noop()}
+    } yield !done)
   }
 
-  def checkSignal[I <: Data](signal: I, value: I): Command[Boolean] = {
-    for {
-      peeked <- peek(signal)
-      _ <- {
-        if (peeked.litValue != value.litValue) {Predef.assert(false, s"Signal $signal wasn't the expected value $value")}
-        step(1)
-      }
-    } yield peeked.litValue == value.litValue
-  }
-
-  def checkStable[I <: Data](signal: I, value: I, cycles: Int): Command[Boolean] = {
-    val checks = Seq.fill(cycles)(checkSignal(signal, value))
-    val allPass = sequence(checks).map(_.forall(b => b))
-    allPass // TODO: move 'expect' into Command sum type, unify with print (e.g. info), and other debug prints
+  def checkStable[I](signal: Interactable[I], value: I, cycles: Int): Command[Boolean] = {
+    repeatCollect(
+      for {
+        good <- signal.compare(value)
+        _ <- step(1)
+      } yield good,
+      cycles
+    ).map(_.forall(x => x))
   }
 }

@@ -19,7 +19,7 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
   behavior of "DecoupledGcd"
 
   // play with these to adjust test execution time
-  val (maxX, maxY) = (30, 30)
+  val (maxX, maxY) = (40, 40)
   val testValues = for {x <- 2 to maxX; y <- 2 to maxY} yield (BigInt(x), BigInt(y), BigInt(x).gcd(y))
   val bitWidth = 60
   val inputBundles = testValues.map { case (a, b, _) =>
@@ -71,9 +71,9 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
       dut.reset.poke(false.B)
       dut.clock.setTimeout(1000)
 
-      val program: Command[Seq[GcdOutputBundle]] = for {
+      val program: Command[Seq[UInt]] = for {
         pushThread <- simcommand.fork(inputCmds.enqueueSeq(inputBundles.toVector), "push")
-        pullThread <- simcommand.fork(outputCmds.dequeueN(outputBundles.length),"pull")
+        pullThread <- simcommand.fork(repeatCollect(outputCmds.dequeue(_.gcd), outputBundles.length),"pull")
         _ <- join(pushThread)
         output <- join(pullThread)
       } yield output
@@ -81,9 +81,9 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
       val result = unsafeRun(program, dut.clock)
       Predef.assert(result.retval.length == outputBundles.length)
       result.retval.zip(outputBundles).foreach { case (actual, gold) =>
-        Predef.assert(actual.gcd.litValue == gold.gcd.litValue)
-        Predef.assert(actual.value1.litValue == gold.value1.litValue)
-        Predef.assert(actual.value2.litValue == gold.value2.litValue)
+        Predef.assert(actual.litValue == gold.gcd.litValue)
+        // Predef.assert(actual.value1.litValue == gold.value1.litValue)
+        // Predef.assert(actual.value2.litValue == gold.value2.litValue)
       }
 
       val deltaSeconds = (System.nanoTime() - startTest) / 1e9d
