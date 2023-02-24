@@ -33,7 +33,7 @@ class DecoupledGcdTester {
       val outputCmds = new DecoupledCommands(dut.output)
 
       dut.reset.poke(true.B)
-      dut.clock.step(2)
+      chiseltest.testableClock(dut.clock).step(2)
       dut.reset.poke(false.B)
       dut.clock.setTimeout(1000)
 

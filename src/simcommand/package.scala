@@ -40,10 +40,30 @@ package object simcommand {
     }
   }
 
+  trait Interactable[I] {
+    def set(value: I): Unit
+    def get(): I
+  }
+  implicit class Chisel3Interactor[I <: Data](value: I) extends Interactable[I] {
+    override def set(p: I): Unit = chiseltest.testableData(value).poke(p)
+    override def get(): I = chiseltest.testableData(value).peek()
+  }
+  private case class PrimitiveInteractor[I](var value: I) extends Interactable[I] {
+    override def set(p: I): Unit = value = p
+    override def get(): I = value
+  }
+
+  trait Steppable {
+    def step(cycles: Int): Unit
+  }
+  case class Chisel3Clock(clock: Clock) extends Steppable {
+    def step(cycles: Int): Unit = chiseltest.testableClock(clock).step(cycles)
+  }
+
   // Command sum type
   //// DUT interaction
-  private[simcommand] case class Poke[I <: Data](signal: I, value: I) extends Command[Unit]
-  private[simcommand] case class Peek[I <: Data](signal: I) extends Command[I]
+  private[simcommand] case class Poke[I](signal: Interactable[I], value: I) extends Command[Unit]
+  private[simcommand] case class Peek[I](signal: Interactable[I]) extends Command[I]
 
   //// Simulator synchronization points
   private[simcommand] case class Step(cycles: Int) extends Command[Int]
@@ -57,7 +77,7 @@ package object simcommand {
 
   //// fork/join synchronization
   private[simcommand] case class ThreadHandle[R](id: Int)
-  private[simcommand] case class Fork[R](c: Command[R], name: String) extends Command[ThreadHandle[R]] {
+  private[simcommand] case class Fork[R](c: Command[R], name: String, order: Int) extends Command[ThreadHandle[R]] {
     def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
   }
   private[simcommand] case class Join[R](threadHandle: ThreadHandle[R]) extends Command[R]
@@ -65,26 +85,30 @@ package object simcommand {
 
   // Inter-thread communication channels
   private[simcommand] case class ChannelHandle[T](id: Int)
-  private[simcommand] case class MakeChannel[T](size: Integer) extends Command[ChannelHandle[T]]
+  private[simcommand] case class MakeChannel[T](size: Int) extends Command[ChannelHandle[T]]
   private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
   private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
   private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
 
   // Public API
 
-  def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config = Config()): Result[R] = {
+  def unsafeRun[R](cmd: Command[R], clock: chisel3.Clock, cfg: Config = Config()): Result[R] = {
+    unsafeRun(cmd, Chisel3Clock(clock), cfg)
+  }
+
+  def unsafeRun[R](cmd: Command[R], clock: Steppable, cfg: Config): Result[R] = {
     Imperative.unsafeRun(cmd, clock, cfg)
   }
 
-  def poke[I <: Data](signal: I, value: I): Command[Unit] = {
+  def poke[I](signal: Interactable[I], value: I): Command[Unit] = {
     Poke(signal, value)
   }
 
-  def peek[I <: Data](signal: I): Command[I] = {
+  def peek[I](signal: Interactable[I]): Command[I] = {
     Peek(signal)
   }
 
-  def step[I <: Data](cycles: Int): Command[Int] = {
+  def step(cycles: Int): Command[Int] = {
     Step(cycles)
   }
 
@@ -96,15 +120,15 @@ package object simcommand {
     lift(())
   }
 
-  def fork[R](cmd: Command[R], name: String): Command[ThreadHandle[R]] = {
-    Fork(cmd, name)
+  def fork[R](cmd: Command[R], name: String, order: Int = 0): Command[ThreadHandle[R]] = {
+    Fork(cmd, name, order)
   }
 
   def join[R](handle: ThreadHandle[R]): Command[R] = {
     Join(handle)
   }
 
-  def makeChannel[R](size: Integer): Command[ChannelHandle[R]] = {
+  def makeChannel[R](size: Int): Command[ChannelHandle[R]] = {
     MakeChannel(size)
   }
 
@@ -118,6 +142,10 @@ package object simcommand {
 
   def nonEmpty[R](chan: ChannelHandle[R]): Command[Boolean] = {
     NonEmpty(chan)
+  }
+
+  def binding[I](value: I): Interactable[I] = {
+    PrimitiveInteractor(value)
   }
 
   // Command combinators (functions that take Commands and return Commands)

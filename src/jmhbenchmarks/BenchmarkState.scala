@@ -20,7 +20,7 @@ class BenchmarkState[R <: Module](mod: () => R) extends TestEnvInterface with Ha
     topFileName = Some(testname)
     batchedFailures.clear()
     val annotation = TargetDirAnnotation("test_run_dir" + File.separator + testname)
-    tester = defaults.createDefaultTester(mod, Seq(annotation, NoThreadingAnnotation))
+    tester = defaults.createDefaultTester(mod, Seq(annotation, VerilatorBackendAnnotation, NoThreadingAnnotation))
   }
 
   def getTestName = testname

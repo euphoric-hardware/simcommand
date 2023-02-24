@@ -1,8 +1,5 @@
 package simcommand
 
-import chisel3.{Clock, Data, assert}
-import chiseltest._
-
 import scala.collection.mutable
 
 case class Config(
@@ -12,13 +9,13 @@ case class Config(
 
 sealed trait Action
 case class StepAct(cycles: Int) extends Action
-case class PokeAct(signal: Data, value: Data) extends Action
-case class PeekAct(signal: Data, value: Data) extends Action
+case class PokeAct[I](signal: Interactable[I], value: I) extends Action
+case class PeekAct[I](signal: Interactable[I], value: I) extends Action
 
 case class Result[R](retval: R, cycles: Int, threadsSpawned: Int, actions: Option[Seq[Action]])
 
 trait Interpreter {
-  def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R]
+  def unsafeRun[R](cmd: Command[R], clock: Steppable, cfg: Config): Result[R]
 }
 
 object Recursive extends Interpreter {
@@ -31,9 +28,9 @@ object Recursive extends Interpreter {
   }
   private case class ThreadData(cmd: Command[_], name: String, id: Int)
   private case class InterpreterCfg(print: Boolean)
-  private case class EC(clock: Clock, threads: Seq[ThreadData])
+  private case class EC(clock: Steppable, threads: Seq[ThreadData])
 
-  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = {
+  override def unsafeRun[R](cmd: Command[R], clock: Steppable, cfg: Config): Result[R] = {
     runInner(cmd, clock, cfg.print, new ThreadIdGenerator())
   }
 
@@ -48,7 +45,7 @@ object Recursive extends Interpreter {
     if (cfg.print) println(s"[$time] [${thread.name} (${thread.id})]: $message")
   }
 
-  private def runInner[R](cmd: Command[R], clock: Clock, print: Boolean, threadIdGen: ThreadIdGenerator): Result[R] = {
+  private def runInner[R](cmd: Command[R], clock: Steppable, print: Boolean, threadIdGen: ThreadIdGenerator): Result[R] = {
     val cfg = InterpreterCfg(print)
     var time = 0
     var ec = EC(clock, Seq(ThreadData(cmd, "MAIN", 0)))
@@ -139,7 +136,7 @@ object Recursive extends Interpreter {
             //debug(cfg, thread, time, s"[Cont] a is not complete, saving pointer at $c")
             (thread.copy(cmd=Cont(c, next)), cycles, newTs)
         }
-      case f @ Fork(c, name) =>
+      case f @ Fork(c, name, order) =>
         val forkedThreadId = threadIdGen.getNewThreadId
         val forkedThreadHandle = f.makeThreadHandle(forkedThreadId)
         debug(cfg, thread, time, s"[Fork] Forking thread $name ($forkedThreadId)")
@@ -159,10 +156,10 @@ object Recursive extends Interpreter {
         }
       case Poke(signal, value) =>
         debug(cfg, thread, time, s"[Poke] $signal <- $value")
-        signal.poke(value)
+        signal.set(value)
         runUntilSync(thread.copy(cmd=noop()), time, cfg, newThreads, threadIdGen, retvals)
       case Peek(signal) =>
-        val value = signal.peek()
+        val value = signal.get()
         debug(cfg, thread, time, s"[Peek] $signal -> $value")
         runUntilSync(thread.copy(cmd=Return(value)), time, cfg, newThreads, threadIdGen, retvals)
       case Return(retval) =>
@@ -181,13 +178,13 @@ object Recursive extends Interpreter {
 }
 
 object Imperative extends Interpreter {
-  override def unsafeRun[R](cmd: Command[R], clock: Clock, cfg: Config): Result[R] = {
+  override def unsafeRun[R](cmd: Command[R], clock: Steppable, cfg: Config): Result[R] = {
     val vm = new Imperative[R](clock)
     vm.unsafeRun(cmd)
   }
 }
 
-class Imperative[R](clock: Clock) {
+class Imperative[R](clock: Steppable) {
   private var time = 0
   private val alive = new mutable.TreeSet[Thread[_]]()
   private val queue = new mutable.Queue[Thread[_]]()
@@ -207,7 +204,7 @@ class Imperative[R](clock: Clock) {
   }
 
   def unsafeRun(cmd: Command[R]): Result[R] = {
-    val main = new Thread(cmd, "main")
+    val main = new Thread(cmd, "main", 0)
     while (alive.nonEmpty) {
       stepClock()
     }
@@ -330,13 +327,17 @@ class Imperative[R](clock: Clock) {
     }
   }
 
-  class Thread[R1](start: Command[R1], name: String) extends Ordered[Thread[_]] {
+  class Thread[R1](start: Command[R1], name: String, val order: Integer) extends Ordered[Thread[_]] {
     var frame = new Frame(None, start)
     var monitor: Option[Monitor[_]] = None
     var status: ThreadStatus[_] = Running
     val handle: ThreadHandle[_] = new ThreadHandle(threadCounter)
 
-    def compare(other: Thread[_]) = handle.id - other.handle.id
+    def compare(other: Thread[_]) =
+      if (order == other.order)
+        handle.id - other.handle.id
+      else
+        order - other.order
 
     threadMap += (handle -> this)
     threadCounter += 1
@@ -369,8 +370,8 @@ class Imperative[R](clock: Clock) {
           case Step(cycles) => {
             monitor = Some(new TimeMonitor(Imperative.this.time + cycles))
           }
-          case Fork(cmd, name) => {
-            val thread = new Thread(cmd, name)
+          case Fork(cmd, name, order) => {
+            val thread = new Thread(cmd, name, order)
             ret(thread.handle)
           }
           case Join(thread) => lookupThread(thread).status match {
@@ -382,8 +383,8 @@ class Imperative[R](clock: Clock) {
               monitor = Some(new ThreadMonitor(lookupThread(thread)))
             }
           }
-          case Poke(signal, value) => ret(signal.poke(value))
-          case Peek(signal) => ret(signal.peek())
+          case Poke(signal, value) => ret(signal.set(value))
+          case Peek(signal) => ret(signal.get())
           case Return(r) => ret(r)
           case Kill(thread) => {
             lookupThread(thread).status = Killed
@@ -430,7 +431,7 @@ class Imperative[R](clock: Clock) {
         //    the next loop will lift in the next interation
         case Some(parent) => parent.cmd match {
           case Cont(_, cn) => frame = new Frame(parent.parent, cn(value))
-          case Rec(st, f) => value match {
+          case Rec(_, f) => value match {
             case Left(l) => frame = new Frame(Some(parent), f(l))
             case Right(r) => frame = new Frame(parent.parent, lift(r))
           }
