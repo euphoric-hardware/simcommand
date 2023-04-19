@@ -37,3 +37,6 @@ novas_dump.log
 .nfs*
 
 sim_build
+
+out/*
+.DS_Store
