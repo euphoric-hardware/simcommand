@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 
 class NeuromorphicProcessorManualThreadTester extends NeuromorphicProcessorTester {
-  it should "process an image" in {
+  it should "process an image" taggedAs(Verilator) in {
     val startElab = System.nanoTime()
     test(new NeuromorphicProcessorBBWrapper())
       .withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { dut =>

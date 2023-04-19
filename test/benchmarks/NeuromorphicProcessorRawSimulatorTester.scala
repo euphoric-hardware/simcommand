@@ -64,7 +64,7 @@ class NeuromorphicProcessorRawSimulatorTester extends NeuromorphicProcessorTeste
     cycles
   }
 
-  it should "process an image" in {
+  it should "process an image" taggedAs(Verilator) in {
     val startElab = System.nanoTime()
 
     // elaborate and compile to low firrtl

@@ -200,7 +200,7 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     runWithChiseltestThreads(TreadleBackendAnnotation)
   }
 
-  it should "work with chiseltest threads and verilator" in {
+  it should "work with chiseltest threads and verilator" taggedAs(Verilator) in {
     runWithChiseltestThreads(VerilatorBackendAnnotation)
   }
 
@@ -208,19 +208,19 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     runWithChiseltestSingleThread(TreadleBackendAnnotation)
   }
 
-  it should "work with chiseltest single threaded and verilator" in {
+  it should "work with chiseltest single threaded and verilator" taggedAs(Verilator) in {
     runWithChiseltestSingleThread(VerilatorBackendAnnotation)
   }
 
-  it should "work with Command API and verilator" in {
+  it should "work with Command API and verilator" taggedAs(Verilator) in {
     runWithCommandAPI(VerilatorBackendAnnotation)
   }
 
-  it should "work with Command API and iverilog" in {
+  it should "work with Command API and iverilog" taggedAs (IVerilog) in {
     runWithCommandAPI(IcarusBackendAnnotation)
   }
 
-  ignore should "work with Command API and VCS" in {
+  it should "work with Command API and VCS" taggedAs (VCS) in {
     runWithCommandAPI(VcsBackendAnnotation)
   }
 
@@ -228,7 +228,7 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     runWithRawSimSingleThread(TreadleBackendAnnotation)
   }
 
-  it should "work with raw simulator and single threaded and verilator" in {
+  it should "work with raw simulator and single threaded and verilator" taggedAs (Verilator) in {
     runWithRawSimSingleThread(VerilatorBackendAnnotation)
   }
 }
