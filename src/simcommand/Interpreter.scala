@@ -1,6 +1,7 @@
 package simcommand
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 case class Config(
   print: Boolean = false, // Controls debug printing for the interpreter
@@ -186,15 +187,21 @@ object Imperative extends Interpreter {
 }
 
 class Imperative[R](clock: Steppable, cfg: Config) {
+  // Thread management
   private var time = 0
   private val alive = new mutable.TreeSet[Thread[_]]()
   private val queue = new mutable.Queue[Thread[_]]()
   private val waiting = new mutable.TreeSet[Thread[_]]()
 
+  // Channels
   private val channelMap = new mutable.WeakHashMap[ChannelHandle[_], Channel[_]]()
   private var channelCounter = 0
   private val threadMap = new mutable.WeakHashMap[ThreadHandle[_], Thread[_]]()
   private var threadCounter = 0
+
+  // Debugging
+  private var actions = new mutable.ArrayBuffer[Action]()
+  private var touched = new mutable.HashMap[Interactable[_], Int]()
 
   def lookupThread[R1](handle: ThreadHandle[R1]): Thread[R1] = {
     threadMap.apply(handle).asInstanceOf[Thread[R1]]
@@ -218,6 +225,8 @@ class Imperative[R](clock: Steppable, cfg: Config) {
   def stepClock(): Unit = {
     queue.clear()
     waiting.clear()
+    touched.clear()
+
     queue ++= alive
     var nextTime = time + 128
 
@@ -289,7 +298,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
 
   class Frame(var parent: Option[Frame], var cmd: Command[_])
 
-  trait ThreadStatus[+N] {
+  sealed trait ThreadStatus[+N] {
     val isDone: Boolean
     def get: N
   }
@@ -363,8 +372,19 @@ class Imperative[R](clock: Steppable, cfg: Config) {
             case Killed => throw new RuntimeException("Cannot join on a killed thread")
             case Running => monitor = Some(ThreadMonitor(lookupThread(thread)))
           }
-          case Poke(signal, value) => ret(signal.set(value))
-          case Peek(signal) => ret(signal.get())
+          case Poke(signal, value) =>
+            if (cfg.recordActions) actions += PokeAct(signal, value)
+            touched(signal) =
+              if (touched.contains(signal)) -1
+              else this.handle.id
+            ret(signal.set(value))
+          case Peek(signal) =>
+            val value = signal.get()
+            if (cfg.recordActions) actions += PeekAct(signal, value)
+            if (touched.contains(signal) && touched(signal) != this.handle.id) {
+              throw new Error("Combinatorial loop")
+            }
+            ret(value)
           case Return(r) => ret(r)
           case Kill(thread) =>
             lookupThread(thread).status = Killed
