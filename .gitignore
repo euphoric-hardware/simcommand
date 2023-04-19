@@ -38,5 +38,6 @@ novas_dump.log
 
 sim_build
 
+docs/*
 out/*
 .DS_Store
