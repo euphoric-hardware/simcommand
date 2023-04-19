@@ -59,7 +59,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
-  "Fork" should "create a thread that operates independently of the main thread" in {
+  "fork" should "create a thread that operates independently of the main thread" in {
     val nElems = 10
     test(new ValidDelayLine(delay=nElems/2)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val vips = new ValidDelayLineVIPs(c.a, c.b, Valid(UInt(10.W)))

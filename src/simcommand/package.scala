@@ -62,6 +62,7 @@ package object simcommand {
       case x: Data => peek(this).map(_.asInstanceOf[Data].litValue == v.asInstanceOf[Data].litValue)
       case _ => peek(this).map(_ == v)
     }
+    override def hashCode(): Int = System.identityHashCode(this)
   }
 
   trait Steppable {
@@ -297,4 +298,6 @@ package object simcommand {
       cycles
     ).map(_.forall(x => x))
   }
+
+  class CombinatorialDependencyException(name: String, order: Int) extends Exception("Detected combinatorial loop in thread '" + name + "' with order " + order)
 }

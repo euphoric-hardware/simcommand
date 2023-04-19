@@ -1,12 +1,12 @@
 package simcommand
 
 import chisel3._
-import chiseltest.{ChiselScalatestTester, VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock}
+import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock}
 import chisel3.util.log2Ceil
 import chiseltest.internal.NoThreadingAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
 
-class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
+class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
   class UARTMock(txBytes: Seq[Int], bitDelay: Int) extends Module {
     val rx = IO(Input(Bool()))
     val tx = IO(Output(Bool()))
@@ -38,7 +38,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   "sendByte" should "produce the right sequence" in {
     val testByte = 0x55
     val bitDelay = 4
-    test(new UARTMock(Seq.empty, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    testChisel(new UARTMock(Seq.empty, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       c.clock.setTimeout(100)
       val cmds = new UARTCommands(uartIn=c.rx, uartOut=c.tx, cyclesPerBit = bitDelay)
       val chkr = new UARTChecker(c.rx)
@@ -57,20 +57,20 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   "receiveByte" should "receive a single byte sent by the UART" in {
     val testByte = Seq(0x55)
     val bitDelay = 4
-    test(new UARTMock(testByte, bitDelay)).withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { c =>
-      val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
-      val result = unsafeRun(cmds.receiveByte(), c.clock)
+    testChisel(new UARTMock(testByte, bitDelay)).withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { c =>
+      val uart = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
+      val result = unsafeRun(uart.receiveByte(), c.clock)
       assert(result.retval == testByte.head)
     }
   }
 
-  "receiveByte" should "receive a single byte sent by the UART (command)" in {
+  "receiveByte" should "receive a single byte sent by the UART (command mock)" in {
     val testByte = 0x55
     val rx = binding(0.B)
     val tx = binding(0.B)
     val bitDelay = 4
 
-    val cmds = new UARTCommands(uartIn = rx, uartOut = tx, cyclesPerBit = bitDelay)
+    val uart = new UARTCommands(uartIn = rx, uartOut = tx, cyclesPerBit = bitDelay)
     val mock = for {
       _ <- poke(tx, 0.B)
       _ <- step(bitDelay)
@@ -83,8 +83,8 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
     } yield ()
 
     val program = for {
-      mockHandle <- fork(mock, name="mock", order=0)
-      receiveHandle <- fork(cmds.receiveByte(), name="receiveByte", order=1)
+      mockHandle <- fork(mock, name="mock")
+      receiveHandle <- fork(uart.receiveByte(), name="receiveByte", order=1)
       _ <- join(mockHandle)
       recv <- join(receiveHandle)
     } yield recv
@@ -96,7 +96,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   "receiveBytes" should "receive multiple bytes sent by the UART" in {
     val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
-    test(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    testChisel(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val result = unsafeRun(cmds.receiveBytes(testBytes.length), c.clock)
       assert(result.retval == testBytes)
@@ -106,7 +106,7 @@ class UARTCommandSpec extends AnyFlatSpec with ChiselScalatestTester {
   "sendBytes" should "successfully send bytes to a forked receiveBytes through a UART loopback" in {
     val testBytes = Seq(0x00, 0x00, 0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
-    test(new UARTLoopback()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    testChisel(new UARTLoopback()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val rxChk = new UARTChecker(c.rx)
       val txChk = new UARTChecker(c.tx)

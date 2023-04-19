@@ -4,15 +4,20 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 case class Config(
-  print: Boolean = false, // Controls debug printing for the interpreter
-  recordActions: Boolean = false, // Controls whether the interpreter should record the actions the program takes
+  // Whether or not to print debug output
+  print: Boolean = false,
+  // Whether or not to record actions the program takes
+  recordActions: Boolean = false,
+  // How many idle cycles the interpreter should allow. A timeout of zero implies no timeout
   timeout: Int = 0,
+  // Fixed point iteration resolves combinatorial dependencies, but is very computationally intensive. (EXPERIMENTAL)
+  fixedPointIteration: Boolean = false
 )
 
 sealed trait Action
-case class StepAct(cycles: Int) extends Action
-case class PokeAct[I](signal: Interactable[I], value: I) extends Action
-case class PeekAct[I](signal: Interactable[I], value: I) extends Action
+case class StepAct(time: Int, cycles: Int) extends Action
+case class PokeAct[I](time: Int, signal: Interactable[I], value: I) extends Action
+case class PeekAct[I](time: Int, signal: Interactable[I], value: I) extends Action
 
 case class Result[R](retval: R, cycles: Int, threadsSpawned: Int, actions: Option[Seq[Action]])
 
@@ -201,7 +206,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
 
   // Debugging
   private var actions = new mutable.ArrayBuffer[Action]()
-  private var touched = new mutable.HashMap[Interactable[_], Int]()
+  private var touched = new mutable.HashMap[Interactable[_], (Int, Int)]()
 
   def lookupThread[R1](handle: ThreadHandle[R1]): Thread[R1] = {
     threadMap.apply(handle).asInstanceOf[Thread[R1]]
@@ -362,7 +367,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
 
         frame.cmd match {
           case Cont(cmd, _) => frame = new Frame(Some(frame), cmd)
-          case Rec(st, fn) => frame = new Frame(Some(frame), fn(st))
+          case Rec(st, fn) => frame = new Frame(Some(frame), fn.asInstanceOf[Any => Command[Either[Any,Any]]](st))
           case Step(cycles) => monitor = Some(TimeMonitor(Imperative.this.time + cycles))
           case Fork(cmd, name, order) =>
             val thread = new Thread(cmd, name, order)
@@ -373,16 +378,25 @@ class Imperative[R](clock: Steppable, cfg: Config) {
             case Running => monitor = Some(ThreadMonitor(lookupThread(thread)))
           }
           case Poke(signal, value) =>
-            if (cfg.recordActions) actions += PokeAct(signal, value)
+            if (cfg.recordActions) actions += PokeAct(time, signal, value)
+            // 1. If this port has not previously been touched, then we mark it as having changed with the current
+            //    thread order.
+            // 2. If the mark happened in a lower order, this is still a valid and defined poke ordering,
+            //    so we update it with the current thread's order.
+            // 3. If the order of the previous poker is the same as the current thread or higher, then this is an
+            //    inversion of poke order and is undefined behavior
             touched(signal) =
-              if (touched.contains(signal)) -1
-              else this.handle.id
+              if (!touched.contains(signal) || touched(signal)._1 < this.order) (this.order, this.handle.id)
+              else throw new CombinatorialDependencyException(this.name, this.order)
             ret(signal.set(value))
           case Peek(signal) =>
             val value = signal.get()
-            if (cfg.recordActions) actions += PeekAct(signal, value)
-            if (touched.contains(signal) && touched(signal) != this.handle.id) {
-              throw new Error("Combinatorial loop")
+            if (cfg.recordActions) actions += PeekAct(time, signal, value)
+            if (
+              touched.contains(signal) &&
+              (touched(signal)._1 > this.order || (touched(signal)._1 == this.order && touched(signal)._2 != this.handle.id))
+            ) {
+              throw new CombinatorialDependencyException(this.name, this.order)
             }
             ret(value)
           case Return(r) => ret(r)
@@ -419,11 +433,11 @@ class Imperative[R](clock: Steppable, cfg: Config) {
         case Some(parent) => parent.cmd match {
           case Cont(_, cn) =>
             frame.parent = parent.parent
-            frame.cmd = cn(value)
+            frame.cmd = cn.asInstanceOf[Any => Command[Any]](value)
           case Rec(_, f) => value match {
             case Left(l) =>
               frame.parent = Some(parent)
-              frame.cmd = f(l)
+              frame.cmd = f.asInstanceOf[Any => Command[Any]](l)
             case Right(r) =>
               frame = parent
               ret(r)

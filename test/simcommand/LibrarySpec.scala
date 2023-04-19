@@ -5,7 +5,7 @@ import chisel3.util.Counter
 import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock}
 import org.scalatest.flatspec.AnyFlatSpec
 
-class LibrarySpec extends AnyFlatSpec with ChiselSimcommandTester {
+class LibrarySpec extends AnyFlatSpec with SimcommandScalatestTester {
   class PokeCounter extends Module {
     val in = IO(Input(Bool()))
     val out = IO(Output(UInt(32.W)))
@@ -25,7 +25,7 @@ class LibrarySpec extends AnyFlatSpec with ChiselSimcommandTester {
   }
 
   "repeat" should "run command repeatedly" in {
-    test(new PokeCounter()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
+    testChisel(new PokeCounter()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
       val program = for {
         _ <- repeat(for {
           _ <- poke(c.in, true.B)
@@ -41,7 +41,7 @@ class LibrarySpec extends AnyFlatSpec with ChiselSimcommandTester {
   }
 
   "repeatCollect" should "collect values" in {
-    test(new LongDelay()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
+    testChisel(new LongDelay()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
       val program = repeatCollect(for {
         r <- peek(c.b)
         _ <- step(1)
@@ -56,7 +56,7 @@ class LibrarySpec extends AnyFlatSpec with ChiselSimcommandTester {
   }
 
   "doWhile" should "not overflow the stack" in {
-    test(new LongDelay()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
+    testChisel(new LongDelay()).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { c =>
       val program = waitForValue(c.a, 1.B)
       c.clock.setTimeout(200000)
       val result = unsafeRun(program, c.clock)
