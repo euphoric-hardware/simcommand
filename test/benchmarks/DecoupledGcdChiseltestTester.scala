@@ -12,6 +12,7 @@ import firrtl.stage.FirrtlCircuitAnnotation
 import firrtl.{AnnotationSeq, EmittedCircuitAnnotation}
 import logger.LogLevelAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.tagobjects.Slow
 
 import simcommand._
 
@@ -196,19 +197,19 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     case _ => false
   }
 
-  it should "work with chiseltest threads and treadle" in {
+  it should "work with chiseltest threads and treadle" taggedAs(Slow) in {
     runWithChiseltestThreads(TreadleBackendAnnotation)
   }
 
-  it should "work with chiseltest threads and verilator" taggedAs(Verilator) in {
+  it should "work with chiseltest threads and verilator" taggedAs(Slow, Verilator) in {
     runWithChiseltestThreads(VerilatorBackendAnnotation)
   }
 
-  it should "work with chiseltest single threaded and treadle" in {
+  it should "work with chiseltest single threaded and treadle" taggedAs(Slow) in {
     runWithChiseltestSingleThread(TreadleBackendAnnotation)
   }
 
-  it should "work with chiseltest single threaded and verilator" taggedAs(Verilator) in {
+  it should "work with chiseltest single threaded and verilator" taggedAs(Slow, Verilator) in {
     runWithChiseltestSingleThread(VerilatorBackendAnnotation)
   }
 
@@ -224,11 +225,11 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     runWithCommandAPI(VcsBackendAnnotation)
   }
 
-  it should "work with raw simulator and single threaded and treadle" in {
+  it should "work with raw simulator and single threaded and treadle" taggedAs(Slow) in {
     runWithRawSimSingleThread(TreadleBackendAnnotation)
   }
 
-  it should "work with raw simulator and single threaded and verilator" taggedAs (Verilator) in {
+  it should "work with raw simulator and single threaded and verilator" taggedAs(Slow, Verilator) in {
     runWithRawSimSingleThread(VerilatorBackendAnnotation)
   }
 }

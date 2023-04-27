@@ -18,5 +18,5 @@ jobs:
         sudo apt-get install -y verilator
         verilator --version
     - name: Build and Test
-      run: ./mill simcommand.test -l IVerilog -l VCS
+      run: ./mill simcommand.test -l IVerilog -l VCS -l org.scalatest.tags.Slow
 

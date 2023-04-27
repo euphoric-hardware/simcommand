@@ -9,6 +9,7 @@ import firrtl.{AnnotationSeq, EmittedCircuitAnnotation}
 import firrtl.annotations.{Annotation, DeletedAnnotation}
 import firrtl.stage.FirrtlCircuitAnnotation
 import logger.LogLevelAnnotation
+import org.scalatest.tagobjects.Slow
 
 import scala.collection.mutable
 
@@ -64,7 +65,7 @@ class NeuromorphicProcessorRawSimulatorTester extends NeuromorphicProcessorTeste
     cycles
   }
 
-  it should "process an image" taggedAs(Verilator) in {
+  it should "process an image" taggedAs(Verilator, Slow) in {
     val startElab = System.nanoTime()
 
     // elaborate and compile to low firrtl

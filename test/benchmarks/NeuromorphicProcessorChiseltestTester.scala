@@ -2,9 +2,10 @@ package benchmarks
 
 import chiseltest._
 import chisel3._
+import org.scalatest.tagobjects.Slow
 
 class NeuromorphicProcessorChiseltestTester extends NeuromorphicProcessorTester {
-  it should "process an image" taggedAs(Verilator) in {
+  it should "process an image" taggedAs(Verilator, Slow) in {
     val startElab = System.nanoTime()
     test(new NeuromorphicProcessorBBWrapper())
       .withAnnotations(Seq(VerilatorBackendAnnotation)) { dut =>

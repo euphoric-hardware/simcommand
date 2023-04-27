@@ -42,10 +42,6 @@ class UARTCommands(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chi
       _ <- sendBit(0)
       _ <- concat((0 until 8).map(i => sendBit((byte >> i) & 0x1)))
       _ <- sendBit(1)
-      _ <- {
-        println(s"Sent byte $byte")
-        noop()
-      }
     } yield ()
   }
 
@@ -88,10 +84,6 @@ class UARTCommands(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chi
       _ <- step(cyclesPerBit + cyclesPerBit / 2) // advance time past 1/2 of last data bit and stop bit
       byte = bits.zipWithIndex.foldLeft(0) {
         case (byte, (bit, index)) => byte | (bit << index)
-      }
-      _ <- {
-        println(s"Received byte $byte")
-        noop()
       }
     } yield byte
   }

@@ -3,12 +3,12 @@ package benchmarks
 import chiseltest._
 import chisel3._
 import chiseltest.internal.NoThreadingAnnotation
+import org.scalatest.tagobjects.Slow
 
 import scala.collection.mutable
 
-
-class NeuromorphicProcessorManualThreadTester extends NeuromorphicProcessorTester {
-  it should "process an image" taggedAs(Verilator) in {
+class NeuromorphicProcessorManualThreadTester extends   NeuromorphicProcessorTester {
+  it should "process an image" taggedAs(Verilator, Slow) in {
     val startElab = System.nanoTime()
     test(new NeuromorphicProcessorBBWrapper())
       .withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { dut =>
