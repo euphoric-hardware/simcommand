@@ -228,7 +228,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
             //    inversion of poke order and is undefined behavior
             touched(signal) =
               if (!touched.contains(signal) || touched(signal)._1 < this.order) (this.order, this.handle.id)
-              else throw new CombinatorialDependencyException(this.name, this.order)
+              else throw new CombinatorialDependencyException(this.name, this.order, frame.cmd)
             ret(signal.set(value))
           case Peek(signal) =>
             val value = signal.get()
@@ -237,7 +237,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
               touched.contains(signal) &&
               (touched(signal)._1 > this.order || (touched(signal)._1 == this.order && touched(signal)._2 != this.handle.id))
             ) {
-              throw new CombinatorialDependencyException(this.name, this.order)
+              throw new CombinatorialDependencyException(this.name, this.order, frame.cmd)
             }
             ret(value)
           case Return(r) => ret(r)

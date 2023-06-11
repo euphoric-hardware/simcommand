@@ -1,6 +1,7 @@
 import chisel3.{Data}
 
 import scala.collection.mutable.ArrayBuffer
+import sourcecode.{Line, FileName, Enclosing}
 
 package object simcommand {
 
@@ -9,7 +10,7 @@ package object simcommand {
     * This class represents an RTL simulation command and its return value
     * @tparam R Type of the command's return value
     */
-  sealed abstract class Command[R] {
+  sealed abstract class Command[R](implicit val line: Line, val filename: FileName, val enclosing: Enclosing) {
     final def map[R2](f: R => R2): Command[R2] = {
       flatMap(r => Return(f(r)))
     }
@@ -38,6 +39,10 @@ package object simcommand {
         case Left(_) => tailRecM(f)
         case Right(result) => lift(result)
       }
+    }
+
+    def debugInfo: String = {
+      this.getClass.getSimpleName + "(" + filename.value + ":" + line.value + ")"
     }
   }
 
@@ -77,33 +82,33 @@ package object simcommand {
 
   // Command sum type
   //// DUT interaction
-  private[simcommand] case class Poke[I](signal: Interactable[I], value: I) extends Command[Unit]
-  private[simcommand] case class Peek[I](signal: Interactable[I]) extends Command[I]
+  private[simcommand] case class Poke[I](signal: Interactable[I], value: I)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[Unit]
+  private[simcommand] case class Peek[I](signal: Interactable[I])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[I]
 
   //// Simulator synchronization points
-  private[simcommand] case class Step(cycles: Int) extends Command[Unit]
+  private[simcommand] case class Step(cycles: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[Unit]
 
   //// End of a command sequence / Pure value
-  private[simcommand] case class Return[R](retval: R) extends Command[R]
+  private[simcommand] case class Return[R](retval: R)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R]
 
   //// Continuation
-  private[simcommand] case class Cont[R1, R2](a: Command[R1], f: R1 => Command[R2]) extends Command[R2]
-  private[simcommand] case class Rec[R1, R2](st: R1, f: R1 => Command[Either[R1, R2]]) extends Command[R2]
+  private[simcommand] case class Cont[R1, R2](a: Command[R1], f: R1 => Command[R2])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R2]
+  private[simcommand] case class Rec[R1, R2](st: R1, f: R1 => Command[Either[R1, R2]])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R2]
 
   //// fork/join synchronization
   private[simcommand] case class ThreadHandle[R](id: Int)
-  private[simcommand] case class Fork[R](c: Command[R], name: String, order: Int) extends Command[ThreadHandle[R]] {
+  private[simcommand] case class Fork[R](c: Command[R], name: String, order: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[ThreadHandle[R]] {
     def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
   }
-  private[simcommand] case class Join[R](threadHandle: ThreadHandle[R]) extends Command[R]
-  private[simcommand] case class Kill[R](threadHandle: ThreadHandle[R]) extends Command[R]
+  private[simcommand] case class Join[R](threadHandle: ThreadHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R]
+  private[simcommand] case class Kill[R](threadHandle: ThreadHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R]
 
   // Inter-thread communication channels
   private[simcommand] case class ChannelHandle[T](id: Int)
-  private[simcommand] case class MakeChannel[T](size: Int) extends Command[ChannelHandle[T]]
-  private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T) extends Command[Unit]
-  private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T]) extends Command[T]
-  private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T]) extends Command[Boolean]
+  private[simcommand] case class MakeChannel[T](size: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[ChannelHandle[T]]
+  private[simcommand] case class Put[T](chan: ChannelHandle[T], data: T)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[Unit]
+  private[simcommand] case class GetBlocking[T](chan: ChannelHandle[T])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[T]
+  private[simcommand] case class NonEmpty[T](chan: ChannelHandle[T])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[Boolean]
 
   // Public API
 
@@ -115,47 +120,47 @@ package object simcommand {
     Imperative.unsafeRun(cmd, clock, cfg)
   }
 
-  def poke[I](signal: Interactable[I], value: I): Command[Unit] = {
+  def poke[I](signal: Interactable[I], value: I)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[Unit] = {
     Poke(signal, value)
   }
 
-  def peek[I](signal: Interactable[I]): Command[I] = {
+  def peek[I](signal: Interactable[I])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[I] = {
     Peek(signal)
   }
 
-  def step(cycles: Int): Command[Unit] = {
+  def step(cycles: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[Unit] = {
     Step(cycles)
   }
 
-  def lift[R](value: R): Command[R] = {
+  def lift[R](value: R)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[R] = {
     Return(value)
   }
 
-  def noop(): Command[Unit] = {
+  def noop()(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[Unit] = {
     lift(())
   }
 
-  def fork[R](cmd: Command[R], name: String, order: Int = 0): Command[ThreadHandle[R]] = {
+  def fork[R](cmd: Command[R], name: String, order: Int = 0)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[ThreadHandle[R]] = {
     Fork(cmd, name, order)
   }
 
-  def join[R](handle: ThreadHandle[R]): Command[R] = {
+  def join[R](handle: ThreadHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[R] = {
     Join(handle)
   }
 
-  def makeChannel[R](size: Int): Command[ChannelHandle[R]] = {
+  def makeChannel[R](size: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[ChannelHandle[R]] = {
     MakeChannel(size)
   }
 
-  def put[R](chan: ChannelHandle[R], data: R): Command[Unit] = {
+  def put[R](chan: ChannelHandle[R], data: R)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[Unit] = {
     Put(chan, data)
   }
 
-  def getBlocking[R](chan: ChannelHandle[R]): Command[R] = {
+  def getBlocking[R](chan: ChannelHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[R] = {
     GetBlocking(chan)
   }
 
-  def nonEmpty[R](chan: ChannelHandle[R]): Command[Boolean] = {
+  def nonEmpty[R](chan: ChannelHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[Boolean] = {
     NonEmpty(chan)
   }
 
@@ -299,5 +304,6 @@ package object simcommand {
     ).map(_.forall(x => x))
   }
 
-  class CombinatorialDependencyException(name: String, order: Int) extends Exception("Detected combinatorial loop in thread '" + name + "' with order " + order)
+  class CombinatorialDependencyException(name: String, order: Int, cmd: Command[_])
+    extends Exception("Detected combinatorial loop in thread '" + name + "' with order " + order + " caused by command " + cmd.debugInfo)
 }

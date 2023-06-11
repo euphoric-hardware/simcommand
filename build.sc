@@ -2,8 +2,6 @@ import mill._
 import scalalib._
 import publish._
 
-import java.nio.file.{Files, Paths}
-
 object simcommand extends ScalaModule with PublishModule {
   override def millSourcePath = os.pwd
 
@@ -17,6 +15,7 @@ object simcommand extends ScalaModule with PublishModule {
     ivy"edu.berkeley.cs::chisel3:$chiselVersion",
     ivy"edu.berkeley.cs::chiseltest:0.5.4",
     ivy"org.scala-lang.modules::scala-async:0.10.0",
+    ivy"com.lihaoyi::sourcecode:0.3.0",
   )
 
   override def scalacOptions = Seq(
