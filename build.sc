@@ -46,7 +46,7 @@ object simcommand extends ScalaModule with PublishModule {
     "-no-link-warnings"
   )
 
-  object test extends Tests with TestModule.ScalaTest {
+  object test extends ScalaTests with TestModule.ScalaTest {
     override def millSourcePath = os.pwd / "test"
     override def sources = T.sources { millSourcePath }
 
