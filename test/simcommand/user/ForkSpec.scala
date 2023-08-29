@@ -51,8 +51,8 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
     def program(nElems: Int): Command[Seq[Int]] = {
       for {
         _ <- step(1)
-        peekerThread <- fork(peeker(nElems), "peeker")
-        pokerThread <- fork(poker(nElems), "poker")
+        peekerThread <- fork(peeker(nElems))
+        pokerThread <- fork(poker(nElems))
         pokerJoin <- join(pokerThread)
         peekerJoin <- join(peekerThread)
       } yield peekerJoin
@@ -70,10 +70,10 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   "fork" should "support threads that terminate on the same cycle they are spawned" in {
     val program = for {
-      _ <- fork(lift(()), "dummy1")
-      _ <- fork(lift(()), "dummy2")
-      _ <- fork(lift(()), "dummy3")
-      _ <- fork(lift(()), "dummy4")
+      _ <- fork(lift(()))
+      _ <- fork(lift(()))
+      _ <- fork(lift(()))
+      _ <- fork(lift(()))
     } yield ()
     val retval = unsafeRun(program, FakeClock(), Config().copy(recordActions = true))
     scalaAssert(retval.actions.isDefined)
@@ -85,7 +85,7 @@ class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   "fork" should "terminate the child threads when the parent terminates" in {
     val program = for {
-      _ <- fork(step(10), name="stepper")
+      _ <- fork(step(10))
       _ <- step(4)
     } yield ()
     val retval = unsafeRun(program, FakeClock(), Config().copy(recordActions = true))

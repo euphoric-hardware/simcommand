@@ -57,7 +57,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
   }
 
   def unsafeRun(cmd: Command[R]): Result[R] = {
-    val main = new Thread(cmd, "main", 0)
+    val main = new Thread(cmd, Some("main"), 0)
     while (alive.nonEmpty) {
       stepClock()
       if (cfg.timeout != 0 && cfg.timeout < time) {
@@ -173,7 +173,7 @@ class Imperative[R](clock: Steppable, cfg: Config) {
     def isEmpty: Boolean = buffer.isEmpty
   }
 
-  class Thread[R1](start: Command[R1], name: String, val order: Int) extends Ordered[Thread[_]] {
+  class Thread[R1](start: Command[R1], name: Option[String], val order: Int) extends Ordered[Thread[_]] {
     var frame = new Frame(None, start)
     var monitor: Option[Monitor[_]] = None
     var status: ThreadStatus[_] = Running

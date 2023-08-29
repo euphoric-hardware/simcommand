@@ -97,7 +97,7 @@ package object simcommand {
 
   //// fork/join synchronization
   private[simcommand] case class ThreadHandle[R](id: Int)
-  private[simcommand] case class Fork[R](c: Command[R], name: String, order: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[ThreadHandle[R]] {
+  private[simcommand] case class Fork[R](c: Command[R], name: Option[String], order: Int)(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[ThreadHandle[R]] {
     def makeThreadHandle(id: Int): ThreadHandle[R] = ThreadHandle[R](id)
   }
   private[simcommand] case class Join[R](threadHandle: ThreadHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing) extends Command[R]
@@ -140,8 +140,12 @@ package object simcommand {
     lift(())
   }
 
+  def fork[R](cmd: Command[R])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[ThreadHandle[R]] = {
+    Fork(cmd, None, order = 0)
+  }
+
   def fork[R](cmd: Command[R], name: String, order: Int = 0)(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[ThreadHandle[R]] = {
-    Fork(cmd, name, order)
+    Fork(cmd, Some(name), order)
   }
 
   def join[R](handle: ThreadHandle[R])(implicit line: Line, filename: FileName, enclosing: Enclosing): Command[R] = {
@@ -304,6 +308,6 @@ package object simcommand {
     ).map(_.forall(x => x))
   }
 
-  class CombinatorialDependencyException(name: String, order: Int, cmd: Command[_])
+  class CombinatorialDependencyException(name: Option[String], order: Int, cmd: Command[_])
     extends Exception("Detected combinatorial loop in thread '" + name + "' with order " + order + " caused by command " + cmd.debugInfo)
 }
