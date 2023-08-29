@@ -1,7 +1,6 @@
 package simcommand
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 case class Config(
   // Whether or not to print debug output
@@ -46,14 +45,14 @@ class Imperative[R](clock: Steppable, cfg: Config) {
   private var threadCounter = 0
 
   // Debugging
-  private var actions = new mutable.ArrayBuffer[Action]()
-  private var touched = new mutable.HashMap[Interactable[_], (Int, Int)]()
+  private val actions = new mutable.ArrayBuffer[Action]()
+  private val touched = new mutable.HashMap[Interactable[_], (Int, Int)]()
 
-  def lookupThread[R1](handle: ThreadHandle[R1]): Thread[R1] = {
+  private def lookupThread[R1](handle: ThreadHandle[R1]): Thread[R1] = {
     threadMap(handle).asInstanceOf[Thread[R1]]
   }
 
-  def lookupChannel[R1](handle: ChannelHandle[R1]): Channel[R1] = {
+  private def lookupChannel[R1](handle: ChannelHandle[R1]): Channel[R1] = {
     channelMap(handle).asInstanceOf[Channel[R1]]
   }
 
@@ -65,10 +64,10 @@ class Imperative[R](clock: Steppable, cfg: Config) {
         throw new Error("simcommand timed out")
       }
     }
-    Result(main.status.get.asInstanceOf[R], time, threadCounter, None)
+    Result(main.status.get.asInstanceOf[R], time, threadCounter, if (cfg.recordActions) Some(actions.toSeq) else None)
   }
 
-  def stepClock(): Unit = {
+  private def stepClock(): Unit = {
     queue.clear()
     waiting.clear()
     touched.clear()
