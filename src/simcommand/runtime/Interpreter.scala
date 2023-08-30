@@ -1,6 +1,12 @@
-package simcommand
+package simcommand.runtime
+
+import simcommand.runtime.Bridges._
+import simcommand.runtime.Primitives._
 
 import scala.collection.mutable
+
+class CombinatorialDependencyException(name: Option[String], order: Int, cmd: Command[_])
+  extends Exception("Detected combinatorial loop in thread '" + name + "' with order " + order + " caused by command " + cmd.sourceInfoString)
 
 case class Config(
   // Whether or not to print debug output

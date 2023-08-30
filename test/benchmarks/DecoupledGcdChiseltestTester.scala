@@ -13,8 +13,8 @@ import firrtl.{AnnotationSeq, EmittedCircuitAnnotation}
 import logger.LogLevelAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.tagobjects.Slow
-
 import simcommand._
+import simcommand.vips.Decoupled
 
 class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "DecoupledGcd"
@@ -64,8 +64,8 @@ class DecoupledGcdChiseltestTester extends AnyFlatSpec with ChiselScalatestTeste
     test(new DecoupledGcd(bitWidth)).withAnnotations(Seq(backend, NoThreadingAnnotation, WriteVcdAnnotation)) { dut =>
       println(s"Took ${(System.nanoTime() - startElab) / 1e9d}s to elaborate, compile and create simulation w/ $simName")
       val startTest = System.nanoTime()
-      val inputCmds = new DecoupledCommands(dut.input)
-      val outputCmds = new DecoupledCommands(dut.output)
+      val inputCmds = new Decoupled(dut.input)
+      val outputCmds = new Decoupled(dut.output)
 
       dut.reset.poke(true.B)
       dut.clock.step(2)

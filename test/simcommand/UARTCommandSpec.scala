@@ -5,6 +5,8 @@ import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation, testableClock
 import chisel3.util.log2Ceil
 import chiseltest.internal.NoThreadingAnnotation
 import org.scalatest.flatspec.AnyFlatSpec
+import simcommand.runtime.{Config, Result}
+import simcommand.vips.{UART, UARTChecker}
 
 class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
   class UARTMock(txBytes: Seq[Int], bitDelay: Int) extends Module {
@@ -40,7 +42,7 @@ class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
     val bitDelay = 4
     testChisel(new UARTMock(Seq.empty, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       c.clock.setTimeout(100)
-      val cmds = new UARTCommands(uartIn=c.rx, uartOut=c.tx, cyclesPerBit = bitDelay)
+      val cmds = new UART(uartIn=c.rx, uartOut=c.tx, cyclesPerBit = bitDelay)
       val chkr = new UARTChecker(c.rx)
       val program = for {
         _ <- cmds.sendReset()
@@ -58,7 +60,7 @@ class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
     val testByte = Seq(0x55)
     val bitDelay = 4
     testChisel(new UARTMock(testByte, bitDelay)).withAnnotations(Seq(VerilatorBackendAnnotation, NoThreadingAnnotation)) { c =>
-      val uart = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
+      val uart = new UART(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val result = unsafeRun(uart.receiveByte(), c.clock)
       assert(result.retval == testByte.head)
     }
@@ -70,7 +72,7 @@ class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
     val tx = binding(0.B)
     val bitDelay = 4
 
-    val uart = new UARTCommands(uartIn = rx, uartOut = tx, cyclesPerBit = bitDelay)
+    val uart = new UART(uartIn = rx, uartOut = tx, cyclesPerBit = bitDelay)
     val mock = for {
       _ <- poke(tx, 0.B)
       _ <- step(bitDelay)
@@ -97,7 +99,7 @@ class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
     val testBytes = Seq(0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
     testChisel(new UARTMock(testBytes, bitDelay)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-      val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
+      val cmds = new UART(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val result = unsafeRun(cmds.receiveBytes(testBytes.length), c.clock)
       assert(result.retval == testBytes)
     }
@@ -107,7 +109,7 @@ class UARTCommandSpec extends AnyFlatSpec with SimcommandScalatestTester {
     val testBytes = Seq(0x00, 0x00, 0x55, 0xff, 0x00, 0xaa)
     val bitDelay = 4
     testChisel(new UARTLoopback()).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-      val cmds = new UARTCommands(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
+      val cmds = new UART(uartIn = c.rx, uartOut = c.tx, cyclesPerBit = bitDelay)
       val rxChk = new UARTChecker(c.rx)
       val txChk = new UARTChecker(c.tx)
 

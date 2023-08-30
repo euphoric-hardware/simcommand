@@ -7,6 +7,7 @@ import chiseltest.{ChiselScalatestTester, WriteVcdAnnotation}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.Assertions.{assert => scalaAssert}
 import simcommand._
+import simcommand.runtime.Config
 
 class ForkSpec extends AnyFlatSpec with ChiselScalatestTester {
   class ValidDelayLine(delay: Int) extends Module {

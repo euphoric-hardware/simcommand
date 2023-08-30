@@ -1,9 +1,10 @@
-package simcommand
+package simcommand.vips
 
 import chisel3._
 import chisel3.util.DecoupledIO
+import simcommand._
 
-class DecoupledCommands[T <: Data](io: DecoupledIO[T]) {
+class Decoupled[T <: Data](io: DecoupledIO[T]) {
   def enqueue(data: T): Command[Unit] = for {
     _ <- poke(io.bits, data)
     _ <- poke(io.valid, true.B)

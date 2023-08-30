@@ -1,26 +1,10 @@
-package simcommand
+package simcommand.vips
 
 import chisel3._
-import chisel3.experimental.{DataMirror, Direction}
+import simcommand._
 
-class UARTCommands(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chisel3.Bool], cyclesPerBit: Int) {
+class UART(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chisel3.Bool], cyclesPerBit: Int) {
   val bitsPerSymbol = 10
-  // sending a UART byte using cocotb
-  /*
-  async def receiveByte(dut, bitDelay: int, byte: int):
-    print("Sending byte {byte}")
-    # Start bit
-    dut.io_uartRx.value = 0
-    await ClockCycles(dut.clock, bitDelay)
-    # Byte
-    for i in range(8):
-      dut.io_uartRx.value = (byte >> i) & 0x1
-      await ClockCycles(dut.clock, bitDelay)
-    # Stop bit
-    dut.io_uartRx.value = 1
-    await ClockCycles(dut.clock, bitDelay)
-    print("Sent byte {byte}")
-  */
 
   def sendReset(): Command[Unit] = {
     // Keep idle high for an entire symbol period to reset any downstream receivers
@@ -49,24 +33,6 @@ class UARTCommands(uartIn: Interactable[chisel3.Bool], uartOut: Interactable[chi
     val cmds = bytes.map(b => sendByte(b))
     concat(cmds)
   }
-
-  // receiving a UART byte using cocotb
-  /*
-  async def transferByte(dut, bitDelay: int) -> int:
-    print("Receiving a byte")
-    byte = 0
-    # Assumes start bit has already been seen
-    await ClockCycles(dut.clock, bitDelay)
-    # Byte
-    for i in range(8):
-      byte = dut.io_uartTx.value << i | byte
-    await ClockCycles(dut.clock, bitDelay)
-    # Stop bit
-      assert dut.io_uartTx.value == 1
-    await ClockCycles(dut.clock, bitDelay)
-    print("Received {byte}")
-    return byte
-   */
 
   def receiveBit(): Command[Int] = {
     // Assuming that a start bit has already been seen and current time is at the midpoint of the start bit

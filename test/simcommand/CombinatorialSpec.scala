@@ -1,6 +1,7 @@
 package simcommand
 
 import org.scalatest.flatspec.AnyFlatSpec
+import simcommand.runtime.{Config,CombinatorialDependencyException}
 
 class CombinatorialSpec extends AnyFlatSpec with SimcommandScalatestTester {
   "combinatorial detection" should "allow same thread read then write" in {
